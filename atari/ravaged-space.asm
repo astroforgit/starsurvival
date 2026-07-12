@@ -1630,27 +1630,17 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
         lda #C_WIN
         sta fr_col
         jsr fill_rect
-        lda #TXT_X              ; title
-        sta text_x
-        lda #0
-        sta text_x+1
-        lda #TITLE_Y
-        sta text_y
-        lda #<s_title
-        ldx #>s_title
-        ldy #C_TITLE
-        jsr text_at
         jsr draw_headers
         jsr draw_rows
         jmp draw_footer
 .endp
 
 .proc draw_headers
-        lda #8
+        lda #4
         sta text_x
         lda #0
         sta text_x+1
-        lda #20
+        lda #8
         sta text_y
         lda #<s_sys
         ldx #>s_sys
@@ -1684,7 +1674,7 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
         jmp text_at
 .endp
 
-row_y_tab dta 30,46,62,78,94,110,126
+row_y_tab dta 18,34,50,66,82,98,114
 
 ; Fractional width tables avoid division in the frame loop. A normal cooldown
 ; advances through eight pixels per second; the speed upgrade uses sixteen.
@@ -1841,7 +1831,7 @@ frac20 dta 0,1,1,2,2,2,3,3,4,4,4,5,5,6,6,6,7,7,8,8,8,9,9,10,10,10,11,11,12,12,12
 .endp
 
 icon_draw_idx dta 0
-icon_draw_x dta 12
+icon_draw_x dta a(12)
 icon_draw_y dta 0
 .proc draw_icon               ; X=system index
         stx icon_draw_idx
@@ -1870,7 +1860,7 @@ icon_draw_y dta 0
         sta bl_ssx
         lda icon_draw_x
         sta calc_x
-        lda #0
+        lda icon_draw_x+1
         sta calc_x+1
         lda icon_draw_y
         sta calc_y
@@ -2132,7 +2122,7 @@ resource_key_glyph dta 48,44,47             ; P,L,O
         sta calc_x
         lda #0
         sta calc_x+1
-        lda #28
+        lda #16
         sta calc_y
         lda #300&255
         sta fr_w
@@ -2260,6 +2250,190 @@ legend_icon dta 0
         jmp draw_text
 .endp
 
+; Compact 3x5 uppercase font and 4x4 icons used only by the one-line legend.
+; Each font byte contains one three-pixel row in bits 2..0.
+tiny_font
+        dta 2,5,7,5,5, 6,5,6,5,6, 3,4,4,4,3, 6,5,5,5,6
+        dta 7,4,6,4,7, 7,4,6,4,4, 3,4,5,5,3, 5,5,7,5,5
+        dta 7,2,2,2,7, 1,1,1,5,2, 5,5,6,5,5, 4,4,4,4,7
+        dta 5,7,7,5,5, 5,7,7,7,5, 2,5,5,5,2, 6,5,6,4,4
+        dta 2,5,5,3,1, 6,5,6,5,5, 3,4,2,1,6, 7,2,2,2,2
+        dta 5,5,5,5,7, 5,5,5,5,2, 5,5,7,7,5, 5,5,2,5,5
+        dta 5,5,2,2,2, 7,1,2,4,7
+tiny_icon_bits
+        dta 2,6,3,2              ; power
+        dta 10,15,14,4           ; life support
+        dta 15,9,11,15           ; processing
+        dta 9,6,6,9              ; engineering
+        dta 6,15,11,15           ; guidance
+        dta 6,15,10,5            ; engines
+        dta 1,10,6,4             ; sensors
+tiny_masks dta 4,2,1
+tiny_icon_masks dta 8,4,2,1
+tiny_x dta a(0)
+tiny_y dta 0
+tiny_glyph dta 0
+tiny_row dta 0
+tiny_col dta 0
+tiny_bits dta 0
+tiny_string_y dta 0
+tiny_colour dta C_TEXT
+
+.proc draw_tiny_pixel
+        lda tiny_x
+        clc
+        adc tiny_col
+        sta calc_x
+        lda tiny_x+1
+        adc #0
+        sta calc_x+1
+        lda tiny_y
+        clc
+        adc tiny_row
+        sta calc_y
+        lda #1
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #1
+        sta fr_h
+        lda tiny_colour
+        sta fr_col
+        jmp fill_rect
+.endp
+
+.proc advance_tiny_x
+        lda tiny_x
+        clc
+        adc #4
+        sta tiny_x
+        bcc ?done
+        inc tiny_x+1
+?done   rts
+.endp
+
+.proc draw_tiny_char           ; A=letter index 0..25
+        sta tiny_glyph
+        asl
+        asl
+        clc
+        adc tiny_glyph          ; glyph * 5
+        tax
+        lda #0
+        sta tiny_row
+?row   lda tiny_font,x
+        sta tiny_bits
+        stx ?font_x
+        lda #0
+        sta tiny_col
+?col   ldy tiny_col
+        lda tiny_masks,y
+        and tiny_bits
+        beq ?next
+        jsr draw_tiny_pixel
+?next  inc tiny_col
+        lda tiny_col
+        cmp #3
+        bne ?col
+        ldx ?font_x
+        inx
+        inc tiny_row
+        lda tiny_row
+        cmp #5
+        bne ?row
+        jmp advance_tiny_x
+?font_x dta 0
+.endp
+
+.proc draw_tiny_text           ; A/X=zero-terminated uppercase label
+        sta txt_ptr
+        stx txt_ptr+1
+        lda #C_TEXT
+        sta tiny_colour
+        ldy #0
+?char  lda (txt_ptr),y
+        beq ?done
+        sty tiny_string_y
+        cmp #32
+        beq ?space
+        sec
+        sbc #65
+        bcc ?space
+        cmp #26
+        bcs ?space
+        jsr draw_tiny_char
+        jmp ?next
+?space jsr advance_tiny_x
+?next  ldy tiny_string_y
+        iny
+        bne ?char
+?done  rts
+.endp
+
+.proc draw_tiny_icon           ; X=system index, tiny_x/tiny_y=position
+        lda icon_cols,x
+        sta tiny_colour
+        txa
+        asl
+        asl
+        tax
+        lda #0
+        sta tiny_row
+?row   lda tiny_icon_bits,x
+        sta tiny_bits
+        stx ?icon_x
+        lda #0
+        sta tiny_col
+?col   ldy tiny_col
+        lda tiny_icon_masks,y
+        and tiny_bits
+        beq ?next
+        jsr draw_tiny_pixel
+?next  inc tiny_col
+        lda tiny_col
+        cmp #4
+        bne ?col
+        ldx ?icon_x
+        inx
+        inc tiny_row
+        lda tiny_row
+        cmp #4
+        bne ?row
+        rts
+?icon_x dta 0
+.endp
+
+.proc draw_tiny_legend_item    ; A/X=label, Y=system, tiny_x=icon position
+        sta ?label
+        stx ?label+1
+        sty ?system
+        lda tiny_x
+        sta icon_draw_x
+        lda tiny_x+1
+        sta icon_draw_x+1
+        lda tiny_y
+        sec
+        sbc #2
+        sta icon_draw_y
+        tya
+        tax
+        jsr draw_icon
+        lda #0
+        sta icon_draw_x+1       ; normal game icons use the first 256 pixels
+        lda tiny_x
+        clc
+        adc #8
+        sta tiny_x
+        bcc ?label_ready
+        inc tiny_x+1
+?label_ready
+        lda ?label
+        ldx ?label+1
+        jmp draw_tiny_text
+?label dta a(0)
+?system dta 0
+.endp
+
 .proc draw_footer
         lda #HINT_X
         sta calc_x
@@ -2273,59 +2447,59 @@ legend_icon dta 0
         sta fr_w
         lda #296/256
         sta fr_w+1
-        lda #38
+        lda #47
         sta fr_h
         lda #C_WIN
         sta fr_col
         jsr fill_rect
         lda #12
-        sta legend_x
-        lda #150
-        sta legend_y
+        sta tiny_x
+        lda #0
+        sta tiny_x+1
+        lda #189
+        sta tiny_y
         lda #<s_power
         ldx #>s_power
         ldy #0
-        jsr draw_legend_item
-        lda #104
-        sta legend_x
+        jsr draw_tiny_legend_item
+        lda #40
+        sta tiny_x
         lda #<s_life
         ldx #>s_life
         ldy #1
-        jsr draw_legend_item
-        lda #220
-        sta legend_x
+        jsr draw_tiny_legend_item
+        lda #96
+        sta tiny_x
         lda #<s_process
         ldx #>s_process
         ldy #2
-        jsr draw_legend_item
-        lda #12
-        sta legend_x
-        lda #162
-        sta legend_y
+        jsr draw_tiny_legend_item
+        lda #144
+        sta tiny_x
         lda #<s_engineer
         ldx #>s_engineer
         ldy #3
-        jsr draw_legend_item
-        lda #120
-        sta legend_x
+        jsr draw_tiny_legend_item
+        lda #196
+        sta tiny_x
         lda #<s_guidance
         ldx #>s_guidance
         ldy #4
-        jsr draw_legend_item
-        lda #220
-        sta legend_x
+        jsr draw_tiny_legend_item
+        lda #236
+        sta tiny_x
         lda #<s_engines
         ldx #>s_engines
         ldy #5
-        jsr draw_legend_item
-        lda #12
-        sta legend_x
-        lda #174
-        sta legend_y
+        jsr draw_tiny_legend_item
+        lda #16
+        sta tiny_x
+        lda #1
+        sta tiny_x+1
         lda #<s_sensors
         ldx #>s_sensors
         ldy #6
-        jmp draw_legend_item
+        jmp draw_tiny_legend_item
 .endp
 
 .proc draw_denied
@@ -2333,7 +2507,7 @@ legend_icon dta 0
         sta text_x
         lda #0
         sta text_x+1
-        lda #184
+        lda #176
         sta text_y
         lda #<s_denied
         ldx #>s_denied
@@ -2818,7 +2992,6 @@ amount_new_cost dta 2,1,2
         jmp draw_price_term
 .endp
 
-s_title    dta c'RAVAGED SPACE - VBXE SURVIVAL',0
 s_power    dta c'POWER',0
 s_life     dta c'LIFE SUPPORT',0
 s_process  dta c'PROCESSING',0

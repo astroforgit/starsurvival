@@ -11,7 +11,7 @@ const COST_LIF = [0, 0, 0, 0, 0, 1, 0];
 const COST_PRC = [1, 0, 0, 2, 0, 1, 1];
 const NAMES = ["POWER", "LIFE SUPPORT", "PROCESSING", "ENGINEERING", "GUIDANCE", "ENGINES", "SENSORS"];
 const ACTION_KEYS = ["P", "L", "O", "E", "G", "N", "S"];
-const ROW_Y = [30, 46, 62, 78, 94, 110, 126];
+const ROW_Y = [18, 34, 50, 66, 82, 98, 114];
 const ICONS = [
   [0x18, 0x18, 0x30, 0x7c, 0x18, 0x30, 0x20, 0x00], // power: bolt
   [0x66, 0xff, 0xff, 0x7e, 0x3c, 0x18, 0x00, 0x00], // life support: heart
@@ -22,6 +22,15 @@ const ICONS = [
   [0x06, 0x0c, 0x58, 0x30, 0x30, 0x7e, 0x18, 0x00]  // sensors: dish
 ];
 const ICON_COLORS = ["#f8d060", "#e85c68", "#e8a060", "#b8c0cc", "#70c8c0", "#e89038", "#909ed8"];
+const TINY_FONT = {
+  A: [2, 5, 7, 5, 5], B: [6, 5, 6, 5, 6], C: [3, 4, 4, 4, 3], D: [6, 5, 5, 5, 6],
+  E: [7, 4, 6, 4, 7], F: [7, 4, 6, 4, 4], G: [3, 4, 5, 5, 3], H: [5, 5, 7, 5, 5],
+  I: [7, 2, 2, 2, 7], J: [1, 1, 1, 5, 2], K: [5, 5, 6, 5, 5], L: [4, 4, 4, 4, 7],
+  M: [5, 7, 7, 5, 5], N: [5, 7, 7, 7, 5], O: [2, 5, 5, 5, 2], P: [6, 5, 6, 4, 4],
+  Q: [2, 5, 5, 3, 1], R: [6, 5, 6, 5, 5], S: [3, 4, 2, 1, 6], T: [7, 2, 2, 2, 2],
+  U: [5, 5, 5, 5, 7], V: [5, 5, 5, 5, 2], W: [5, 5, 7, 7, 5], X: [5, 5, 2, 5, 5],
+  Y: [5, 5, 2, 2, 2], Z: [7, 1, 2, 4, 7]
+};
 
 const C = {
   bg: "#080810", border: "#142050", win: "#0c1434", text: "#ececec",
@@ -317,6 +326,20 @@ function textAt(text, x, y, color = C.text, align = "left") {
   ctx.fillText(text, x, y);
 }
 
+function tinyTextAt(text, x, y, color = C.text) {
+  for (const character of text) {
+    const rows = TINY_FONT[character];
+    if (rows) {
+      rows.forEach((bits, row) => {
+        for (let column = 0; column < 3; column++) {
+          if (bits & (4 >> column)) fillRect(x + column, y + row, 1, 1, color);
+        }
+      });
+    }
+    x += 4;
+  }
+}
+
 function drawIcon(index, x, y) {
   const rows = ICONS[index];
   for (let row = 0; row < 8; row++) {
@@ -342,12 +365,11 @@ function drawScreen() {
   fillRect(0, 0, SCR_W, SCR_H, C.bg);
   fillRect(4, 3, 312, 194, C.border);
   fillRect(6, 5, 308, 190, C.win);
-  textAt("RAVAGED SPACE - VBXE SURVIVAL", 12, 8, C.title);
-  textAt("KEY", 8, 20, C.hint);
-  textAt("STATUS", 32, 20, C.hint);
-  textAt("ACTION", 116, 20, C.hint);
-  textAt("LOAD", 216, 20, C.hint);
-  textAt("M", 288, 20, C.hint);
+  textAt("KEY", 8, 8, C.hint);
+  textAt("STATUS", 32, 8, C.hint);
+  textAt("ACTION", 116, 8, C.hint);
+  textAt("LOAD", 216, 8, C.hint);
+  textAt("M", 288, 8, C.hint);
   drawRows();
   drawFooter();
   if (gameMode) drawEnd();
@@ -358,8 +380,7 @@ function drawScreen() {
 function drawRows() {
   for (let i = 0; i < NAMES.length; i++) {
     const y = ROW_Y[i];
-    const rowBackground = i === selected ? C.selected : C.win;
-    if (i === selected) fillRect(12, y, 296, 14, rowBackground);
+    const rowBackground = C.win;
     if ((unlocked[i] && cooldown[i] > 0) || specialTimer[i] > 0) {
       const progress = specialTimer[i] > 0 ? specialTimer[i] / 20 : cooldown[i] / cooldownMax[i];
       fillRect(112, y, Math.round(100 * progress), 14, C.cooldown);
@@ -419,16 +440,17 @@ function drawLegendItem(index, label, x, y) {
 }
 
 function drawFooter() {
-  drawLegendItem(0, "POWER", 12, 150);
-  drawLegendItem(1, "LIFE SUPPORT", 104, 150);
-  drawLegendItem(2, "PROCESSING", 220, 150);
-  drawLegendItem(3, "ENGINEERING", 12, 162);
-  drawLegendItem(4, "GUIDANCE", 120, 162);
-  drawLegendItem(5, "ENGINES", 220, 162);
-  drawLegendItem(6, "SENSORS", 12, 174);
+  const legend = [
+    [0, "POWER", 12], [1, "LIFE SUPPORT", 40], [2, "PROCESSING", 96],
+    [3, "ENGINEERING", 144], [4, "GUIDANCE", 196], [5, "ENGINES", 236], [6, "SENSORS", 272]
+  ];
+  legend.forEach(([index, label, x]) => {
+    drawIcon(index, x, 187);
+    tinyTextAt(label, x + 8, 189);
+  });
   if (performance.now() < deniedUntil) {
-    fillRect(10, 184, 300, 9, C.win);
-    textAt("ACTION LOCKED, COOLING, OR TOO COSTLY", 12, 184, C.offline);
+    fillRect(10, 176, 300, 9, C.win);
+    textAt("ACTION LOCKED, COOLING, OR TOO COSTLY", 12, 176, C.offline);
   }
 }
 
@@ -489,18 +511,28 @@ function drawModificationModal() {
     drawIcon(index, 56, y);
     textAt(NAMES[index], 70, y, installed ? C.hint : C.text);
     if (installed) textAt("INSTALLED", 210, y, C.online);
-    textAt(getModificationDetail(modalType, index), 70, y + 10, installed ? C.hint : C.text);
+    if (modalType === "amount") drawAmountModificationDetail(index, y + 10, installed ? C.hint : C.text);
+    else textAt(getModificationDetail(modalType, index), 70, y + 10, installed ? C.hint : C.text);
   });
   textAt("ESC CANCEL", 204, 150, C.hint);
 }
 
+function drawAmountModificationDetail(index, y, arrowColor) {
+  const oldGain = [2, 1, 3][index];
+  const costIcon = [2, 0, 0][index];
+  const oldCost = [1, 1, 1][index];
+  const newGain = [5, 3, 7][index];
+  const newCost = [2, 1, 2][index];
+  drawPriceTerm(oldGain, index, 70, y);
+  drawPriceTerm(-oldCost, costIcon, 94, y);
+  textAt(">", 120, y, arrowColor);
+  drawPriceTerm(newGain, index, 132, y);
+  drawPriceTerm(-newCost, costIcon, 156, y);
+}
+
 function getModificationDetail(type, index) {
   if (type === "amount") {
-    return [
-      "+2P -1O > +5P -2O",
-      "+1L -1P > +3L -1P",
-      "+3O -1P > +7O -2P"
-    ][index];
+    return "";
   }
   if (type === "auto") return "MANUAL > AUTO EVERY COOLDOWN";
   return "10 SEC COOLDOWN > 5 SEC COOLDOWN";
