@@ -1,0 +1,840 @@
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ravaged Space</title><link rel="stylesheet" href="game.css"><style id="inert-style">
+[inert] {
+  pointer-events: none;
+  cursor: default;
+}
+
+[inert], [inert] * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+</style></head><body><span id="aria-polite" class="visually-hidden" aria-live="polite"></span> <span id="aria-assertive" class="visually-hidden" aria-live="assertive"></span><main role="application" class="game" data-modal-hide=""><div class="sidebar"><system-status-table class="mobile-header"><table role="table" class="system-status" aria-label="Systems">
+      <thead>
+        <tr role="row">
+          <th role="columnheader" id="system-header"><span class="visually-hidden">System</span></th>
+          <th role="columnheader" id="resource-header">Resource Systems</th>
+          <th role="columnheader" id="action-header">Action</th>
+          <th role="columnheader" id="load-header"><span class="table-spacer"><span class="load-price start visually-hidden">Load</span></span></th>
+          <th role="columnheader" id="modifications-header"><span class="table-spacer start visually-hidden">Modifications</span></th>
+        </tr>
+      </thead><tbody><tr role="row">
+        <th role="rowheader" id="power-header" headers="system-header">
+          <span class="visually-hidden">Power</span>
+        </th>
+        <td role="cell" headers="power-header resource-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-bolt"></span></span>
+            <span aria-hidden="true">Power</span>
+            <span id="power-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="power">
+      <span class="status-wrapper" role="img" aria-label="offline: 2 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="power-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="power-header action-header">
+          <div>
+            <button id="power-button" data-action="power" aria-disabled="true" aria-describedby="power-describe">
+              <span class="action-name">Generate Power</span>
+              <computed-price path="actions.power.price"><span class="online">+2</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="power-describe" hidden=""></span>
+          </div>
+          
+        </td>
+        <td role="cell" headers="power-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="power-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="power-load-describe" data-system-load="power">
+              <computed-price path="systems.power.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="power-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="power-header modifications-header">
+          
+          
+        </td></tr><tr role="row">
+        <th role="rowheader" id="lifeSupport-header" headers="system-header">
+          <span class="visually-hidden">Life Support</span>
+        </th>
+        <td role="cell" headers="lifeSupport-header resource-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-heartbeat"></span></span>
+            <span aria-hidden="true">Life Support</span>
+            <span id="lifeSupport-status-icon"><span class="degraded fas fa-exclamation-triangle"></span></span>
+            <system-status system="lifeSupport">
+      <span class="status-wrapper" role="img" aria-label="degraded: 7 of 10 health; Losing 1 on next load cycle">
+        
+      <span class="status-bar degraded full">
+        <span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span>
+        
+            <span class="cycle-loss-wrapper">
+              <span class="cycle-loss" data-opacity=""><span class="status full"></span></span>
+              <span class="status empty"></span>
+            </span>
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="lifeSupport-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="lifeSupport-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="lifeSupport-button" data-action="lifeSupport" aria-disabled="true" aria-describedby="lifeSupport-describe" tabindex="-1">
+              <span class="action-name">Cycle Air</span>
+              <computed-price path="actions.lifeSupport.price"><span class="online">+1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="lifeSupport-describe" hidden=""></span>
+          </div>
+          
+        </td>
+        <td role="cell" headers="lifeSupport-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="lifeSupport-load-button" tabindex="-1" aria-disabled="true" class="no-focus load-price" aria-describedby="lifeSupport-load-describe" data-system-load="lifeSupport">
+              <computed-price path="systems.lifeSupport.load" class="action-load"><span class="offline">-1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="lifeSupport-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="lifeSupport-header modifications-header">
+          
+          
+        </td></tr><tr role="row">
+        <th role="rowheader" id="processing-header" headers="system-header">
+          <span class="visually-hidden">Processing</span>
+        </th>
+        <td role="cell" headers="processing-header resource-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-dice-d6"></span></span>
+            <span aria-hidden="true">Processing</span>
+            <span id="processing-status-icon"><span class="online fas fa-check-circle"></span></span>
+            <system-status system="processing">
+      <span class="status-wrapper" role="img" aria-label="online: 9 of 10 health">
+        
+      <span class="status-bar online full">
+        <span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="processing-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="processing-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="processing-button" data-action="processing" aria-disabled="true" aria-describedby="processing-describe" tabindex="-1">
+              <span class="action-name">Mine asteroid</span>
+              <computed-price path="actions.processing.price"><span class="online">+3</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="processing-describe" hidden=""></span>
+          </div>
+          
+        </td>
+        <td role="cell" headers="processing-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="processing-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="processing-load-describe" data-system-load="processing">
+              <computed-price path="systems.processing.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="processing-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="processing-header modifications-header">
+          
+          
+        </td></tr></tbody><tbody><tr role="row">
+          <th><span class="visually-hidden"></span></th>
+          <th role="columnheader" colspan="4" class="main-header" id="main-header">Main Systems</th>
+        </tr><tr role="row">
+        <th role="rowheader" id="engineering-header" headers="system-header">
+          <span class="visually-hidden">Engineering</span>
+        </th>
+        <td role="cell" headers="engineering-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-tools"></span></span>
+            <span aria-hidden="true">Engineering</span>
+            <span id="engineering-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="engineering">
+      <span class="status-wrapper" role="img" aria-label="offline: 2 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="engineering-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="engineering-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="engineering-button" data-action="engineering" aria-disabled="true" aria-describedby="engineering-describe" tabindex="-1">
+              <span class="action-name">Repair Engineering</span>
+              <computed-price path="actions.engineering.price"><span class="online">+2</span><span role="img" aria-label="Engineering"><span class="fas fa-tools"></span></span> <span class="offline">-2</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-2</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engineering-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="engineering" aria-disabled="true" aria-describedby="engineering-describe" tabindex="-1">
+                Install Source
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="engineering-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="engineering-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="engineering-load-describe" data-system-load="engineering">
+              <computed-price path="systems.engineering.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engineering-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="engineering-header modifications-header">
+          
+            <div class="table-spacer start visually-hidden">
+              <button data-upgrade-modal="amount" inert="" data-hidden="true" aria-disabled="true" aria-hidden="true" tabindex="-1">
+                Resource Amount
+              </button>
+            
+          </div>
+        </td></tr><tr role="row">
+        <th role="rowheader" id="guidance-header" headers="system-header">
+          <span class="visually-hidden">Guidance</span>
+        </th>
+        <td role="cell" headers="guidance-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-robot"></span></span>
+            <span aria-hidden="true">Guidance</span>
+            <span id="guidance-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="guidance">
+      <span class="status-wrapper" role="img" aria-label="offline: 2 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="guidance-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="guidance-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="guidance-button" data-action="guidance" aria-disabled="true" aria-describedby="guidance-describe" tabindex="-1">
+              <span class="action-name">Recalculate Guidance</span>
+              <computed-price path="actions.guidance.price"><span class="online">+2</span><span role="img" aria-label="Guidance"><span class="fas fa-robot"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="guidance-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="guidance" aria-disabled="true" aria-describedby="guidance-describe" tabindex="-1">
+                Plot Course
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="guidance-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="guidance-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="guidance-load-describe" data-system-load="guidance">
+              <computed-price path="systems.guidance.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="guidance-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="guidance-header modifications-header">
+          
+            <div class="table-spacer start visually-hidden">
+              <button data-upgrade-modal="auto" inert="" data-hidden="true" aria-disabled="true" aria-hidden="true" tabindex="-1">
+                Auto Resource
+              </button>
+            
+          </div>
+        </td></tr><tr role="row">
+        <th role="rowheader" id="engines-header" headers="system-header">
+          <span class="visually-hidden">Engines</span>
+        </th>
+        <td role="cell" headers="engines-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-rocket"></span></span>
+            <span aria-hidden="true">Engines</span>
+            <span id="engines-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="engines">
+      <span class="status-wrapper" role="img" aria-label="offline: 1 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="engines-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="engines-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="engines-button" data-action="engines" aria-disabled="true" aria-describedby="engines-describe" tabindex="-1">
+              <span class="action-name">Stabilize Engines</span>
+              <computed-price path="actions.engines.price"><span class="online">+3</span><span role="img" aria-label="Engines"><span class="fas fa-rocket"></span></span> <span class="offline">-3</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engines-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="engines" aria-disabled="true" aria-describedby="engines-describe" tabindex="-1">
+                Activate JumpDrive
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="engines-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="engines-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="engines-load-describe" data-system-load="engines">
+              <computed-price path="systems.engines.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engines-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="engines-header modifications-header">
+          
+            <div class="table-spacer start visually-hidden">
+              <button data-upgrade-modal="speed" inert="" data-hidden="true" aria-disabled="true" aria-hidden="true" tabindex="-1">
+                Resource Speed
+              </button>
+            
+          </div>
+        </td></tr><tr role="row">
+        <th role="rowheader" id="sensors-header" headers="system-header">
+          <span class="visually-hidden">Sensors</span>
+        </th>
+        <td role="cell" headers="sensors-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-satellite-dish"></span></span>
+            <span aria-hidden="true">Sensors</span>
+            <span id="sensors-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="sensors">
+      <span class="status-wrapper" role="img" aria-label="offline: 3 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="sensors-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="sensors-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="sensors-button" data-action="sensors" aria-disabled="true" aria-describedby="sensors-describe" tabindex="-1">
+              <span class="action-name">Calibrate Sensors</span>
+              <computed-price path="actions.sensors.price"><span class="online">+2</span><span role="img" aria-label="Sensors"><span class="fas fa-satellite-dish"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="sensors-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="sensors" aria-disabled="true" aria-describedby="sensors-describe" tabindex="-1">
+                Scan Sector
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="sensors-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="sensors-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="sensors-load-describe" data-system-load="sensors">
+              <computed-price path="systems.sensors.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="sensors-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="sensors-header modifications-header">
+          
+          
+        </td></tr></tbody></table></system-status-table><div hidden=""><button data-action="powerLoad"></button> <button data-action="lifeSupportLoad"></button></div><div class="pause"><div class="pause-overlay" hidden=""><span>Game Paused</span></div><button aria-disabled="true" type="button" id="pause" role="switch" aria-label="Pause Game" aria-checked="false"><span>Resume Game</span> <span>Pause Game</span></button></div><div class="mute"><button aria-disabled="true" type="button" id="mute" role="switch" aria-label="Mute" aria-checked="false"><span>Unmute</span> <span>Mute</span></button></div></div><div class="intro" id="intro"><div><h1>Ravaged Space</h1><p>Your spaceship was hit by an asteroid while on an exploration mission. It's badly damaged. Life support is failing and most systems are offline. You'll need to have your crew repair and manually operate them until they are working again.</p><p>Start by <span class="keyword">Generating Power</span>. With power online we can start bringing other systems on one by one. Once all the <span class="keyword">Main Systems</span> are online <span aria-hidden="true">(<span class="online fas fa-check-circle"></span>)</span> we should be able to jump to a spaceport to make repairs.</p><p>Remember that reactivating systems can increase the <span class="keyword">System Load</span>. Choose which systems to activate wisely because if we lose a single system we won't be able to make it.</p><p class="visually-hidden">Screen Reader Tips: You can adjust the game speed in the Options. You can find the current status of each System in the corresponding column to the left of each System Action button. Announce the time remaining to the next Load Cycle by pressing <kbd>L</kbd>. Pause the game at any time by pressing <kbd>P</kbd>.</p><button onclick="start()">Start</button> <button onclick="options()">Options</button></div><div class="credits">Made by <a href="https://stevenklambert.com/">Steven Lambert</a>. Music by <a href="https://opengameart.org/content/last-stand-in-space">Brandon Morris</a></div></div><system-status-table class="mobile-actions start" hidden=""><table role="table" class="system-status" aria-label="Systems">
+      <thead>
+        <tr role="row">
+          <th role="columnheader" id="system-header"><span class="visually-hidden">System</span></th>
+          <th role="columnheader" id="resource-header">Resource Systems</th>
+          <th role="columnheader" id="action-header">Action</th>
+          <th role="columnheader" id="load-header"><span class="table-spacer"><span class="load-price start visually-hidden">Load</span></span></th>
+          <th role="columnheader" id="modifications-header"><span class="table-spacer start visually-hidden">Modifications</span></th>
+        </tr>
+      </thead><tbody><tr role="row">
+        <th role="rowheader" id="power-header" headers="system-header">
+          <span class="visually-hidden">Power</span>
+        </th>
+        <td role="cell" headers="power-header resource-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-bolt"></span></span>
+            <span aria-hidden="true">Power</span>
+            <span id="power-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="power">
+      <span class="status-wrapper" role="img" aria-label="offline: 2 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="power-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="power-header action-header">
+          <div>
+            <button id="power-button" data-action="power" aria-disabled="true" aria-describedby="power-describe">
+              <span class="action-name">Generate Power</span>
+              <computed-price path="actions.power.price"><span class="online">+2</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="power-describe" hidden=""></span>
+          </div>
+          
+        </td>
+        <td role="cell" headers="power-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="power-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="power-load-describe" data-system-load="power">
+              <computed-price path="systems.power.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="power-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="power-header modifications-header">
+          
+          
+        </td></tr><tr role="row">
+        <th role="rowheader" id="lifeSupport-header" headers="system-header">
+          <span class="visually-hidden">Life Support</span>
+        </th>
+        <td role="cell" headers="lifeSupport-header resource-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-heartbeat"></span></span>
+            <span aria-hidden="true">Life Support</span>
+            <span id="lifeSupport-status-icon"><span class="degraded fas fa-exclamation-triangle"></span></span>
+            <system-status system="lifeSupport">
+      <span class="status-wrapper" role="img" aria-label="degraded: 7 of 10 health; Losing 1 on next load cycle">
+        
+      <span class="status-bar degraded full">
+        <span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span>
+        
+            <span class="cycle-loss-wrapper">
+              <span class="cycle-loss" data-opacity=""><span class="status full"></span></span>
+              <span class="status empty"></span>
+            </span>
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="lifeSupport-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="lifeSupport-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="lifeSupport-button" data-action="lifeSupport" aria-disabled="true" aria-describedby="lifeSupport-describe" tabindex="-1">
+              <span class="action-name">Cycle Air</span>
+              <computed-price path="actions.lifeSupport.price"><span class="online">+1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="lifeSupport-describe" hidden=""></span>
+          </div>
+          
+        </td>
+        <td role="cell" headers="lifeSupport-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="lifeSupport-load-button" tabindex="-1" aria-disabled="true" class="no-focus load-price" aria-describedby="lifeSupport-load-describe" data-system-load="lifeSupport">
+              <computed-price path="systems.lifeSupport.load" class="action-load"><span class="offline">-1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="lifeSupport-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="lifeSupport-header modifications-header">
+          
+          
+        </td></tr><tr role="row">
+        <th role="rowheader" id="processing-header" headers="system-header">
+          <span class="visually-hidden">Processing</span>
+        </th>
+        <td role="cell" headers="processing-header resource-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-dice-d6"></span></span>
+            <span aria-hidden="true">Processing</span>
+            <span id="processing-status-icon"><span class="online fas fa-check-circle"></span></span>
+            <system-status system="processing">
+      <span class="status-wrapper" role="img" aria-label="online: 9 of 10 health">
+        
+      <span class="status-bar online full">
+        <span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="processing-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="processing-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="processing-button" data-action="processing" aria-disabled="true" aria-describedby="processing-describe" tabindex="-1">
+              <span class="action-name">Mine asteroid</span>
+              <computed-price path="actions.processing.price"><span class="online">+3</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="processing-describe" hidden=""></span>
+          </div>
+          
+        </td>
+        <td role="cell" headers="processing-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="processing-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="processing-load-describe" data-system-load="processing">
+              <computed-price path="systems.processing.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="processing-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="processing-header modifications-header">
+          
+          
+        </td></tr></tbody><tbody><tr role="row">
+          <th><span class="visually-hidden"></span></th>
+          <th role="columnheader" colspan="4" class="main-header" id="main-header">Main Systems</th>
+        </tr><tr role="row">
+        <th role="rowheader" id="engineering-header" headers="system-header">
+          <span class="visually-hidden">Engineering</span>
+        </th>
+        <td role="cell" headers="engineering-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-tools"></span></span>
+            <span aria-hidden="true">Engineering</span>
+            <span id="engineering-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="engineering">
+      <span class="status-wrapper" role="img" aria-label="offline: 2 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="engineering-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="engineering-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="engineering-button" data-action="engineering" aria-disabled="true" aria-describedby="engineering-describe" tabindex="-1">
+              <span class="action-name">Repair Engineering</span>
+              <computed-price path="actions.engineering.price"><span class="online">+2</span><span role="img" aria-label="Engineering"><span class="fas fa-tools"></span></span> <span class="offline">-2</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-2</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engineering-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="engineering" aria-disabled="true" aria-describedby="engineering-describe" tabindex="-1">
+                Install Source
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="engineering-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="engineering-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="engineering-load-describe" data-system-load="engineering">
+              <computed-price path="systems.engineering.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engineering-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="engineering-header modifications-header">
+          
+            <div class="table-spacer start visually-hidden">
+              <button data-upgrade-modal="amount" inert="" data-hidden="true" aria-disabled="true" aria-hidden="true" tabindex="-1">
+                Resource Amount
+              </button>
+            
+          </div>
+        </td></tr><tr role="row">
+        <th role="rowheader" id="guidance-header" headers="system-header">
+          <span class="visually-hidden">Guidance</span>
+        </th>
+        <td role="cell" headers="guidance-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-robot"></span></span>
+            <span aria-hidden="true">Guidance</span>
+            <span id="guidance-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="guidance">
+      <span class="status-wrapper" role="img" aria-label="offline: 2 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="guidance-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="guidance-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="guidance-button" data-action="guidance" aria-disabled="true" aria-describedby="guidance-describe" tabindex="-1">
+              <span class="action-name">Recalculate Guidance</span>
+              <computed-price path="actions.guidance.price"><span class="online">+2</span><span role="img" aria-label="Guidance"><span class="fas fa-robot"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="guidance-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="guidance" aria-disabled="true" aria-describedby="guidance-describe" tabindex="-1">
+                Plot Course
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="guidance-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="guidance-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="guidance-load-describe" data-system-load="guidance">
+              <computed-price path="systems.guidance.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="guidance-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="guidance-header modifications-header">
+          
+            <div class="table-spacer start visually-hidden">
+              <button data-upgrade-modal="auto" inert="" data-hidden="true" aria-disabled="true" aria-hidden="true" tabindex="-1">
+                Auto Resource
+              </button>
+            
+          </div>
+        </td></tr><tr role="row">
+        <th role="rowheader" id="engines-header" headers="system-header">
+          <span class="visually-hidden">Engines</span>
+        </th>
+        <td role="cell" headers="engines-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-rocket"></span></span>
+            <span aria-hidden="true">Engines</span>
+            <span id="engines-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="engines">
+      <span class="status-wrapper" role="img" aria-label="offline: 1 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="engines-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="engines-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="engines-button" data-action="engines" aria-disabled="true" aria-describedby="engines-describe" tabindex="-1">
+              <span class="action-name">Stabilize Engines</span>
+              <computed-price path="actions.engines.price"><span class="online">+3</span><span role="img" aria-label="Engines"><span class="fas fa-rocket"></span></span> <span class="offline">-3</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engines-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="engines" aria-disabled="true" aria-describedby="engines-describe" tabindex="-1">
+                Activate JumpDrive
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="engines-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="engines-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="engines-load-describe" data-system-load="engines">
+              <computed-price path="systems.engines.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="engines-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="engines-header modifications-header">
+          
+            <div class="table-spacer start visually-hidden">
+              <button data-upgrade-modal="speed" inert="" data-hidden="true" aria-disabled="true" aria-hidden="true" tabindex="-1">
+                Resource Speed
+              </button>
+            
+          </div>
+        </td></tr><tr role="row">
+        <th role="rowheader" id="sensors-header" headers="system-header">
+          <span class="visually-hidden">Sensors</span>
+        </th>
+        <td role="cell" headers="sensors-header main-header">
+          <div class="status-grid">
+            <span aria-hidden="true"><span class="fas fa-satellite-dish"></span></span>
+            <span aria-hidden="true">Sensors</span>
+            <span id="sensors-status-icon"><span class="offline fas fa-window-close"></span></span>
+            <system-status system="sensors">
+      <span class="status-wrapper" role="img" aria-label="offline: 3 of 10 health">
+        
+      <span class="status-bar offline full">
+        <span class="status full"></span><span class="status full"></span><span class="status full"></span>
+        
+      </span>
+      <span class="status-bar">
+        
+        <span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span><span class="status empty"></span>
+      </span>
+      </span></system-status>
+            <span aria-hidden="true" class="change">
+              <span id="sensors-diff" class="diff"></span>
+            </span>
+          </div>
+        </td>
+        <td role="cell" headers="sensors-header action-header">
+          <div inert="" data-hidden="true" aria-hidden="true">
+            <button id="sensors-button" data-action="sensors" aria-disabled="true" aria-describedby="sensors-describe" tabindex="-1">
+              <span class="action-name">Calibrate Sensors</span>
+              <computed-price path="actions.sensors.price"><span class="online">+2</span><span role="img" aria-label="Sensors"><span class="fas fa-satellite-dish"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="sensors-describe" hidden=""></span>
+          </div>
+          
+            <div inert="" hidden="true" aria-hidden="true">
+              <button data-special="sensors" aria-disabled="true" aria-describedby="sensors-describe" tabindex="-1">
+                Scan Sector
+                <span class="cooldown" style="width: 0%;"></span>
+              </button>
+            </div>
+        </td>
+        <td role="cell" headers="sensors-header load-header">
+          <div class="table-spacer start visually-hidden">
+            <button id="sensors-load-button" tabindex="-1" hidden="true" aria-disabled="true" class="no-focus load-price" aria-describedby="sensors-load-describe" data-system-load="sensors">
+              <computed-price path="systems.sensors.load" class="action-load"></computed-price>
+              <span class="cooldown" style="width: 0%;"></span>
+            </button>
+            <span id="sensors-load-describe" hidden=""></span>
+          </div>
+        </td>
+        <td role="cell" headers="sensors-header modifications-header">
+          
+          
+        </td></tr></tbody></table></system-status-table></main><options-modal id="options">
+      <div class="options modal" role="modal" tabindex="-1">
+        <h2 id="option-title">Options</h2>
+
+        <form aria-labelledby="option-title" onsubmit="return false">
+          <label for="color-blind" id="color-blind-label">Color Blind Mode:</label>
+          <button type="button" id="color-blind" name="color-blind" role="checkbox" aria-labelledby="color-blind-label" aria-checked="false" data-no-close="true">
+            <span>On</span>
+            <span>Off</span>
+          </button>
+
+          <label for="music" id="music-label">Music:</label>
+          <button type="button" id="music" name="music" role="checkbox" aria-labelledby="music-label" aria-checked="true" data-no-close="true">
+            <span>On</span>
+            <span>Off</span>
+          </button>
+
+          <label id="volume-label" for="volume">Volume:</label>
+          <div class="input-group">
+            <input type="range" id="volume" name="volume" min="0" max="100" step="5" value="100">
+            <div id="volume-output" class="range-output" aria-hidden="true">100</div>
+          </div>
+
+          <label for="game-speed">Game Speed:</label>
+          <div class="input-group">
+            <input type="range" id="game-speed" name="game-speed" min="0" max="200" step="10" value="100">
+            <div id="game-speed-output" class="range-output" aria-hidden="true">100</div>
+          </div>
+
+          <button id="save" class="save">Save</button>
+        </form>
+      <button style="margin-top: 1rem;" data-close="true">Close</button></div></options-modal><div class="start" hidden=""><game-modal data-upgrade="amount"><div role="modal" tabindex="-1" class="modal"><h2 id="option-title">Improve Resource System Action</h2><p>With Engineering functional, we think we can cobble together something that will more than double a <span class="keyword">Resource System's</span> action.</p><p>Once we get Engineering repaired more, we should be able to do this for more systems.</p><p><em>Note: You can choose to do this at a later time.</em></p><p><button data-system="power"><span class="action-name"><span class="keyword">Generate Power</span> Action</span><div class="compare-upgrade"><span class="visually-hidden">Before:</span><computed-price path="actions.power.price" data-bind-once=""><span class="online">+2</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-1</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price><span aria-hidden="true" class="fas fa-long-arrow-alt-right"></span> <span class="visually-hidden">After:</span><computed-price path="actions.power.upgradePrice" data-bind-once=""><span class="online">+5</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span> <span class="offline">-2</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span></computed-price></div></button></p><p><button data-system="lifeSupport"><span class="action-name"><span class="keyword">Cycle Air</span> Action</span><div class="compare-upgrade"><span class="visually-hidden">Before:</span><computed-price path="actions.lifeSupport.price" data-bind-once=""><span class="online">+1</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price><span aria-hidden="true" class="fas fa-long-arrow-alt-right"></span> <span class="visually-hidden">After:</span><computed-price path="actions.lifeSupport.upgradePrice" data-bind-once=""><span class="online">+3</span><span role="img" aria-label="Life Support"><span class="fas fa-heartbeat"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price></div></button></p><p><button data-system="processing"><span class="action-name"><span class="keyword">Mine Asteroid</span> Action</span><div class="compare-upgrade"><span class="visually-hidden">Before:</span><computed-price path="actions.processing.price" data-bind-once=""><span class="online">+3</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span> <span class="offline">-1</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price><span aria-hidden="true" class="fas fa-long-arrow-alt-right"></span> <span class="visually-hidden">After:</span><computed-price path="actions.processing.upgradePrice" data-bind-once=""><span class="online">+7</span><span role="img" aria-label="Processing"><span class="fas fa-dice-d6"></span></span> <span class="offline">-2</span><span role="img" aria-label="Power"><span class="fas fa-bolt"></span></span></computed-price></div></button></p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal data-upgrade="auto"><div role="modal" tabindex="-1" class="modal"><p>Now that the Guidance system has been recalculated, our Engineers believe they can use it to auto produce a single system.</p><p>Once Guidance is repaired some more, we should be able to do this for more systems.</p><p><em>Note: you can choose to do this at a later time.</em></p><p><button data-system="power">Auto <span class="keyword">Generate Power</span></button> <button data-system="lifeSupport">Auto <span class="keyword">Cycle Air</span></button> <button data-system="processing">Auto <span class="keyword">Mine Asteroid</span></button></p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal data-upgrade="speed"><div role="modal" tabindex="-1" class="modal"><h2 id="option-title">Reduce Resource System Cooldown</h2><p>With the engines stabilized we don't have to worry about them blowing up on us. As an added benefit we believe we can use them to reduce the cooldown of a single system.</p><p>As the engines stabilize more, we should be able to do this for more systems.</p><p><em>Note: you can choose to do this at a later time.</em></p><p><button data-system="power"><span class="action-name"><span class="keyword">Generate Power</span> Cooldown</span><div class="compare-upgrade"><span class="visually-hidden">Before:</span><div><span data-bind-once="">10.00</span>s</div><span aria-hidden="true" class="fas fa-long-arrow-alt-right"></span> <span class="visually-hidden">After:</span><div><span data-bind-once="">5.00</span>s</div></div></button></p><p><button data-system="lifeSupport"><span class="action-name"><span class="keyword">Cycle Air</span> Cooldown</span><div class="compare-upgrade"><span class="visually-hidden">Before:</span><div><span data-bind-once="">10.00</span>s</div><span aria-hidden="true" class="fas fa-long-arrow-alt-right"></span> <span class="visually-hidden">After:</span><div><span data-bind-once="">5.00</span>s</div></div></button></p><p><button data-system="processing"><span class="action-name"><span class="keyword">Mine Asteroid</span> Cooldown</span><div class="compare-upgrade"><span class="visually-hidden">Before:</span><div><span data-bind-once="">10.00</span>s</div><span aria-hidden="true" class="fas fa-long-arrow-alt-right"></span> <span class="visually-hidden">After:</span><div><span data-bind-once="">5.00</span>s</div></div></button></p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal id="pre-sensors-special"><div role="modal" tabindex="-1" class="modal"><p>Sir! Our sensors have just completed a scan of the asteroid and we have some bad news. If we continue to mine the asteroid at our current rate we will deplete it of resources before we can finish repairing the ship.</p><p>We'll need to <span class="keyword">Scan the Sector</span> to see if we can find an alternative power source before that happens.</p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal id="sensors-special"><div role="modal" tabindex="-1" class="modal"><p>Great news captain! Our sensors have detected a renewable power source not too far away. If we can sufficiently <span class="keyword">Recalculate Guidance</span> and <span class="keyword">Stabilize the Engines</span> we should be able to <span class="keyword">Plot a Course</span> to Sector 5 and then <span class="keyword">Activate the JumpDrive</span>.</p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal id="engines-special"><div role="modal" tabindex="-1" class="modal"><p>We've arrived at the power source and our Engineers will begin the collection process. We'll just need to make sure we <span class="keyword">Repair Engineering</span> sufficiently so we can install the power source. Once that's done we should have enough power to finish making repairs.</p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal id="engineering-special"><div role="modal" tabindex="-1" class="modal"><p>Our Engineers were successfully able to install the new power source. It looks like it's generating enough power to finish the repairs.</p><button style="margin-top: 1rem;" data-close="true">Close</button></div></game-modal><game-modal id="win-game" no-close=""><div role="modal" tabindex="-1" class="modal"><p>Great work sir! All <span class="keyword">Main Systems</span> are back online and we can now make the jump to the nearest spaceport.</p><h2 style="text-align: center;">You Win!</h2></div></game-modal><game-modal id="lose-game" no-close=""><div role="modal" tabindex="-1" class="modal"><p id="fail-message"></p><button onclick="document.location.reload(true)">Start Over</button></div></game-modal></div><script src="https://cdn.jsdelivr.net/npm/@webcomponents/custom-elements@1.4.0/custom-elements.min.js"></script><script src="game.js"></script><script defer="" src="https://static.itch.io/htmlgame.js" type="text/javascript"></script><script src="https://cdn.jsdelivr.net/npm/wicg-inert@3.0.1/dist/inert.min.js"></script></body></html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ravaged Space - VBXE Web Edition</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <main class="console" aria-labelledby="game-title">
+    <h1 id="game-title">Ravaged Space</h1>
+    <div class="screen-shell">
+      <canvas id="screen" width="320" height="200" tabindex="0"
+        aria-label="Ravaged Space systems console"></canvas>
+      <div class="scanlines" aria-hidden="true"></div>
+    </div>
+
+    <div class="controller" aria-label="Game controls">
+      <div class="dpad">
+        <button type="button" data-control="up" aria-label="Select previous system" title="Previous system">▲</button>
+        <button type="button" data-control="left" aria-label="Buy amount or automation modification" title="Amount / automation">◀</button>
+        <span aria-hidden="true"></span>
+        <button type="button" data-control="right" aria-label="Buy speed modification" title="Speed modification">▶</button>
+        <button type="button" data-control="down" aria-label="Select next system" title="Next system">▼</button>
+      </div>
+      <div class="mod-keys" aria-label="Modification shortcuts">
+        <button type="button" data-control="amount" aria-label="Install amount modification" title="Amount modification">A</button>
+        <button type="button" data-control="auto" aria-label="Install automation modification" title="Automation modification">U</button>
+        <button type="button" data-control="speed" aria-label="Install speed modification" title="Speed modification">D</button>
+      </div>
+      <button class="fire" type="button" data-control="fire" aria-label="Perform selected action" title="Fire / repair">FIRE</button>
+    </div>
+    <p id="announcement" class="visually-hidden" aria-live="polite"></p>
+  </main>
+  <script type="module" src="/src/game.js"></script>
+</body>
+</html>
