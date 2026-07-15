@@ -21,7 +21,7 @@ const ICONS = [
   [0x18, 0x3c, 0x7e, 0x5a, 0x5a, 0x3c, 0x66, 0x00], // engines: rocket
   [0x06, 0x0c, 0x58, 0x30, 0x30, 0x7e, 0x18, 0x00]  // sensors: dish
 ];
-const ICON_COLORS = ["#f8d060", "#e85c68", "#e8a060", "#b8c0cc", "#70c8c0", "#e89038", "#909ed8"];
+const ICON_COLORS = ["#e8b84c", "#d76a45", "#d89c4a", "#a8aa8d", "#62a881", "#cb7f35", "#778f76"];
 const TINY_FONT = {
   A: [2, 5, 7, 5, 5], B: [6, 5, 6, 5, 6], C: [3, 4, 4, 4, 3], D: [6, 5, 5, 5, 6],
   E: [7, 4, 6, 4, 7], F: [7, 4, 6, 4, 4], G: [3, 4, 5, 5, 3], H: [5, 5, 7, 5, 5],
@@ -33,10 +33,10 @@ const TINY_FONT = {
 };
 
 const C = {
-  bg: "#080810", border: "#142050", win: "#0c1434", text: "#ececec",
-  title: "#d8b450", value: "#f8d060", hint: "#78788c", online: "#48cc80",
-  degraded: "#e8b848", offline: "#e04848", selected: "#244070",
-  cooldown: "#59627d", loadProgress: "#304b69"
+  bg: "#090b08", border: "#38452d", win: "#11180f", text: "#c8c6a2",
+  title: "#d6a84a", value: "#e8bd55", hint: "#777b62", online: "#62b878",
+  degraded: "#d3a54b", offline: "#d0583f", selected: "#263b27",
+  cooldown: "#52614a", loadProgress: "#354f3c"
 };
 
 const canvas = document.querySelector("#screen");
