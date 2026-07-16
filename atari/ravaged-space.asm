@@ -104,6 +104,7 @@ C_SELECT  = 15
 C_COOLDOWN = 16
 C_LOADPROG = 17
 C_ICON_BASE = 18
+C_NOISE   = 25                  ; faint phosphor grain; icon colours stay 18..24
 
 ; ---- game layout ----
 WIN_X   = 4
@@ -1059,24 +1060,24 @@ xdl_len = * - xdl_data
 ?done   rts
 .endp
 pal_tab
-        dta 0,   8,  8, 16      ; background
-        dta 1, 168,192,240      ; _color+1  arrow
-        dta 2, 120,148,208      ; _color+2  bevel light
-        dta 3,  84,112,180      ; _color+3  (invert pivot)
-        dta 4,  52, 76,144      ; _color+4  face
-        dta 5,  28, 44,104      ; _color+5  bevel dark
-        dta 6,  20, 32, 80      ; window border
-        dta 7,  12, 20, 52      ; window face
-        dta 8, 236,236,236      ; text
-        dta 9, 216,180, 80      ; title
-        dta 10,248,208, 96      ; value
-        dta 11,120,120,140      ; hint
-        dta 12, 72,204,128      ; online
-        dta 13,232,184, 72      ; degraded
-        dta 14,224, 72, 72      ; offline/destroyed
-        dta 15, 36, 64,112      ; selected row
-        dta 16, 89, 98,125      ; animated action cooldown
-        dta 17, 48, 75,105      ; animated load cycle
+        dta 0,   1,  7,  4      ; near-black CRT surround
+        dta 1, 179,255,199      ; _color+1  bright phosphor arrow
+        dta 2,  83,255,139      ; _color+2  bevel light
+        dta 3,  45,200,103      ; _color+3  invert pivot
+        dta 4,  14, 82, 45      ; _color+4  button face
+        dta 5,   4, 36, 19      ; _color+5  bevel dark
+        dta 6,  31,184, 97      ; neon-green window border
+        dta 7,   3, 19, 11      ; dark-green window face
+        dta 8, 130,245,167      ; phosphor text
+        dta 9, 183,255,202      ; bright title
+        dta 10,141,255,174      ; active value
+        dta 11, 55,141, 89      ; dim hint
+        dta 12, 80,255,134      ; online
+        dta 13,183,217, 74      ; degraded
+        dta 14,255,110, 85      ; offline/destroyed
+        dta 15, 13, 59, 35      ; selected row
+        dta 16, 20, 82, 47      ; animated action cooldown
+        dta 17, 13, 62, 37      ; animated load cycle
         dta 18,248,208, 96      ; power bolt
         dta 19,232, 92,104      ; life-support heart
         dta 20,232,160, 96      ; processing core
@@ -1084,6 +1085,7 @@ pal_tab
         dta 22,112,200,192      ; guidance robot
         dta 23,232,144, 56      ; engines rocket
         dta 24,144,158,216      ; sensors dish
+        dta 25, 10, 46, 25      ; low-contrast CRT colour noise
         dta $FF
 
 ;=============================================================================
@@ -1376,6 +1378,114 @@ fr_col  dta 0
         jmp do_blit
 .endp
 
+; Rounded filled rectangle for the VBXE framebuffer. Three overlapping fills
+; produce two stepped corner pixels, which reads as a soft 3px radius at 320x200.
+rr_x    dta a(0)
+rr_y    dta 0
+rr_w    dta a(0)
+rr_h    dta 0
+rr_col  dta 0
+.proc fill_round_rect
+        lda calc_x
+        sta rr_x
+        lda calc_x+1
+        sta rr_x+1
+        lda calc_y
+        sta rr_y
+        lda fr_w
+        sta rr_w
+        lda fr_w+1
+        sta rr_w+1
+        lda fr_h
+        sta rr_h
+        lda fr_col
+        sta rr_col
+
+        ; Top/bottom strip: inset two pixels.
+        lda rr_x
+        clc
+        adc #2
+        sta calc_x
+        lda rr_x+1
+        adc #0
+        sta calc_x+1
+        lda rr_y
+        sta calc_y
+        lda rr_w
+        sec
+        sbc #4
+        sta fr_w
+        lda rr_w+1
+        sbc #0
+        sta fr_w+1
+        lda rr_h
+        sta fr_h
+        lda rr_col
+        sta fr_col
+        jsr fill_rect
+
+        ; Second strip: inset one pixel on every side.
+        lda rr_x
+        clc
+        adc #1
+        sta calc_x
+        lda rr_x+1
+        adc #0
+        sta calc_x+1
+        lda rr_y
+        clc
+        adc #1
+        sta calc_y
+        lda rr_w
+        sec
+        sbc #2
+        sta fr_w
+        lda rr_w+1
+        sbc #0
+        sta fr_w+1
+        lda rr_h
+        sec
+        sbc #2
+        sta fr_h
+        jsr fill_rect
+
+        ; Full-width centre strip.
+        lda rr_x
+        sta calc_x
+        lda rr_x+1
+        sta calc_x+1
+        lda rr_y
+        clc
+        adc #2
+        sta calc_y
+        lda rr_w
+        sta fr_w
+        lda rr_w+1
+        sta fr_w+1
+        lda rr_h
+        sec
+        sbc #4
+        sta fr_h
+        jsr fill_rect
+
+        ; Restore the caller's rectangle parameters.
+        lda rr_x
+        sta calc_x
+        lda rr_x+1
+        sta calc_x+1
+        lda rr_y
+        sta calc_y
+        lda rr_w
+        sta fr_w
+        lda rr_w+1
+        sta fr_w+1
+        lda rr_h
+        sta fr_h
+        lda rr_col
+        sta fr_col
+        rts
+.endp
+
 ;=============================================================================
 ; text
 ;=============================================================================
@@ -1614,7 +1724,7 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #WIN_X+2            ; ...around an inset face. (The game blits a crop of
         sta calc_x              ;   the original BACK*.SCR artwork in here instead.)
         lda #0
@@ -1629,10 +1739,11 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         jsr draw_headers
         jsr draw_rows
-        jmp draw_footer
+        jsr draw_footer
+        jmp draw_crt_noise
 .endp
 
 .proc draw_headers
@@ -1912,11 +2023,11 @@ status_col dta 0
         bcs ?empty
         lda status_col
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         jmp ?next
 ?empty  lda #C_TEXT
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         inc calc_x
         inc calc_y
         lda #5
@@ -2502,6 +2613,50 @@ tiny_colour dta C_TEXT
         jmp draw_tiny_legend_item
 .endp
 
+; A fixed, sparse phosphor pattern keeps the interface legible while breaking up
+; the perfectly flat framebuffer. Points sit mainly in the gaps between rows.
+noise_idx dta 0
+.proc draw_crt_noise
+        lda #2
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #1
+        sta fr_h
+        lda #C_NOISE
+        sta fr_col
+        lda #0
+        sta noise_idx
+?point ldx noise_idx
+        lda crt_noise_points+2,x
+        cmp #$FF
+        beq ?done
+        sta calc_y
+        lda crt_noise_points,x
+        sta calc_x
+        lda crt_noise_points+1,x
+        sta calc_x+1
+        jsr fill_rect
+        lda noise_idx
+        clc
+        adc #3
+        sta noise_idx
+        bne ?point
+?done   rts
+.endp
+
+crt_noise_points
+        dta a(16),17,  a(74),17,  a(158),17, a(242),17, a(304),17
+        dta a(58),31,  a(137),31, a(263),31
+        dta a(18),47,  a(186),47, a(302),47
+        dta a(92),63,  a(230),63
+        dta a(44),79,  a(169),79, a(276),79
+        dta a(121),95, a(248),95
+        dta a(67),111, a(193),111, a(304),127
+        dta a(35),137, a(152),142, a(282),133
+        dta a(20),173, a(103),181, a(251),177, a(300),184
+        dta 0,0,$FF
+
 .proc draw_denied
         lda #HINT_X
         sta text_x
@@ -2530,7 +2685,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #30
         sta calc_x
         lda #56
@@ -2543,7 +2698,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #48
         sta text_x
         lda #0
@@ -2710,7 +2865,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #30
         sta calc_x
         lda #56
@@ -2723,7 +2878,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jmp fill_rect
+        jmp fill_round_rect
 .endp
 
 modal_idx dta 0
@@ -2744,7 +2899,7 @@ modal_mask dta 0
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #22
         sta calc_x
         lda #34
@@ -2757,7 +2912,7 @@ modal_mask dta 0
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #36
         sta text_x
         lda #0
@@ -2837,7 +2992,7 @@ modal_mask dta 0
         beq ?face
         lda #C_BORDER
 ?face   sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda ?installed
         bne ?icon
         lda #40

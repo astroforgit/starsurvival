@@ -33,10 +33,10 @@ const TINY_FONT = {
 };
 
 const C = {
-  bg: "#090b08", border: "#38452d", win: "#11180f", text: "#c8c6a2",
-  title: "#d6a84a", value: "#e8bd55", hint: "#777b62", online: "#62b878",
-  degraded: "#d3a54b", offline: "#d0583f", selected: "#263b27",
-  cooldown: "#52614a", loadProgress: "#354f3c"
+  bg: "#010704", border: "#1fb861", win: "#03130b", text: "#82f5a7",
+  title: "#b7ffca", value: "#8dffae", hint: "#378d59", online: "#50ff86",
+  degraded: "#b7d94a", offline: "#ff6e55", selected: "#0d3b23",
+  cooldown: "#14522f", loadProgress: "#0d3e25"
 };
 
 const canvas = document.querySelector("#screen");
@@ -318,9 +318,16 @@ function fillRect(x, y, width, height, color) {
   ctx.fillRect(x, y, width, height);
 }
 
+function fillRoundRect(x, y, width, height, radius, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.fill();
+}
+
 function textAt(text, x, y, color = C.text, align = "left") {
   ctx.fillStyle = color;
-  ctx.font = "8px monospace";
+  ctx.font = '700 8px "Arial Narrow", "Liberation Sans Narrow", "Lucida Console", monospace';
   ctx.textBaseline = "top";
   ctx.textAlign = align;
   ctx.fillText(text, x, y);
@@ -353,18 +360,18 @@ function drawStatusBoxes(value, x, y, color, rowBackground) {
   for (let cell = 0; cell < 10; cell++) {
     const cellX = x + cell * 8;
     if (cell < value) {
-      fillRect(cellX, y, 7, 6, color);
+      fillRoundRect(cellX, y, 7, 6, 2, color);
     } else {
-      fillRect(cellX, y, 7, 6, C.text);
-      fillRect(cellX + 1, y + 1, 5, 4, rowBackground);
+      fillRoundRect(cellX, y, 7, 6, 2, C.hint);
+      fillRoundRect(cellX + 1, y + 1, 5, 4, 1, rowBackground);
     }
   }
 }
 
 function drawScreen() {
   fillRect(0, 0, SCR_W, SCR_H, C.bg);
-  fillRect(4, 3, 312, 194, C.border);
-  fillRect(6, 5, 308, 190, C.win);
+  fillRoundRect(4, 3, 312, 194, 5, C.border);
+  fillRoundRect(6, 5, 308, 190, 4, C.win);
   textAt("KEY", 8, 8, C.hint);
   textAt("STATUS", 32, 8, C.hint);
   textAt("ACTION", 116, 8, C.hint);
@@ -383,10 +390,10 @@ function drawRows() {
     const rowBackground = C.win;
     if ((unlocked[i] && cooldown[i] > 0) || specialTimer[i] > 0) {
       const progress = specialTimer[i] > 0 ? specialTimer[i] / 20 : cooldown[i] / cooldownMax[i];
-      fillRect(112, y, Math.round(100 * progress), 14, C.cooldown);
+      fillRoundRect(112, y, Math.round(100 * progress), 14, 3, C.cooldown);
     }
     if ((systemLoadPwr[i] || systemLoadLif[i]) && loadSec > 0) {
-      fillRect(212, y, Math.round(72 * loadSec / 20), 14, C.loadProgress);
+      fillRoundRect(212, y, Math.round(72 * loadSec / 20), 14, 3, C.loadProgress);
     }
     if (isActionActive(i)) textAt(ACTION_KEYS[i], 8, y + 3, C.value);
     drawIcon(i, 20, y + 3);
@@ -455,8 +462,8 @@ function drawFooter() {
 }
 
 function drawEnd() {
-  fillRect(28, 54, 264, 94, C.border);
-  fillRect(30, 56, 260, 90, C.win);
+  fillRoundRect(28, 54, 264, 94, 5, C.border);
+  fillRoundRect(30, 56, 260, 90, 4, C.win);
   const won = gameMode === 1;
   if (won) {
     textAt("ALL MAIN SYSTEMS ONLINE", 48, 68, C.online);
@@ -484,8 +491,8 @@ function drawStoryModal() {
     3: ["SOURCE INSTALLED", "POWER OUTPUT IS NOW ENOUGH", "TO COMPLETE ALL REPAIRS."]
   };
   const lines = stories[storyType];
-  fillRect(28, 54, 264, 94, C.border);
-  fillRect(30, 56, 260, 90, C.win);
+  fillRoundRect(28, 54, 264, 94, 5, C.border);
+  fillRoundRect(30, 56, 260, 90, 4, C.win);
   textAt(lines[0], 48, 68, C.title);
   textAt(lines[1], 48, 86, C.text);
   textAt(lines[2], 48, 98, C.text);
@@ -498,15 +505,15 @@ function drawModificationModal() {
     auto: "RUNS ONE RESOURCE AUTOMATICALLY",
     speed: "HALVES ONE RESOURCE COOLDOWN"
   };
-  fillRect(20, 32, 280, 136, C.border);
-  fillRect(22, 34, 276, 132, C.win);
+  fillRoundRect(20, 32, 280, 136, 5, C.border);
+  fillRoundRect(22, 34, 276, 132, 4, C.win);
   textAt(`${modalType.toUpperCase()} MODIFICATION`, 36, 42, C.title);
   textAt(descriptions[modalType], 36, 53, C.hint);
   const mask = getMask(modalType);
   [0, 1, 2].forEach((index, option) => {
     const y = 70 + option * 24;
     const installed = Boolean(mask & (1 << index));
-    fillRect(32, y - 2, 256, 22, installed ? C.border : C.selected);
+    fillRoundRect(32, y - 2, 256, 22, 3, installed ? C.border : C.selected);
     if (!installed) textAt(ACTION_KEYS[index], 40, y, C.value);
     drawIcon(index, 56, y);
     textAt(NAMES[index], 70, y, installed ? C.hint : C.text);
