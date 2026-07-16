@@ -1,5 +1,10 @@
 "use strict";
 
+import titleImageUrl from "../pic/girl1.png";
+import powerFailureImageUrl from "../pic/gameover-power-web.png";
+import repairImageUrl from "../pic/repair-web.png";
+import successImageUrl from "../pic/success-web.png";
+
 // Browser equivalents of the Atari data tables. Keep ordering synchronized
 // with health/cooldown/unlocked/clicks in atari/ravaged-space.asm.
 const SCR_W = 320;
@@ -33,17 +38,24 @@ const TINY_FONT = {
 };
 
 const C = {
-  bg: "#090b08", border: "#38452d", win: "#11180f", text: "#c8c6a2",
-  title: "#d6a84a", value: "#e8bd55", hint: "#777b62", online: "#62b878",
-  degraded: "#d3a54b", offline: "#d0583f", selected: "#263b27",
-  cooldown: "#52614a", loadProgress: "#354f3c"
+  bg: "#010704", border: "#1fb861", win: "#03130b", text: "#82f5a7",
+  title: "#b7ffca", value: "#8dffae", hint: "#378d59", online: "#50ff86",
+  degraded: "#b7d94a", offline: "#ff6e55", selected: "#0d3b23",
+  cooldown: "#14522f", loadProgress: "#0d3e25"
 };
 
 const canvas = document.querySelector("#screen");
 const ctx = canvas.getContext("2d", { alpha: false });
 const announcement = document.querySelector("#announcement");
+const titleScreen = document.querySelector("#title-screen");
+const titleArt = document.querySelector("#title-art");
+titleArt.src = titleImageUrl;
 ctx.imageSmoothingEnabled = false;
 
+let titleActive = true;
+let briefingActive = false;
+let briefingChars = 0;
+let briefingStarted = 0;
 let selected;
 let loadSec;
 let gameMode; // 0 playing, 1 won, 2 lost
@@ -71,6 +83,38 @@ let storyType;
 let failureSystem;
 let deniedUntil;
 let lastTime = performance.now();
+
+const failureImage = new Image();
+failureImage.addEventListener("load", () => {
+  if (!titleActive && gameMode === 2) drawScreen();
+});
+failureImage.src = powerFailureImageUrl;
+
+const successImage = new Image();
+successImage.addEventListener("load", () => {
+  if (!titleActive && gameMode === 1) drawScreen();
+});
+successImage.src = successImageUrl;
+
+const FAILURE_TEXT = {
+  0: ["POWER SYSTEM FAILURE", "THE LIGHTS FAIL. AIR STALES.", "THE CREW FALLS SILENT."],
+  1: ["LIFE SUPPORT FAILURE", "THE AIR TURNS STALE.", "THE CREW DRIFTS TO SLEEP."],
+  2: ["PROCESSING FAILURE", "POWER CONTROL COLLAPSES.", "FIRE CONSUMES THE SHIP."]
+};
+
+const BRIEFING_LINES = [
+  "AN ASTEROID STRIKE HAS LEFT",
+  "YOUR SHIP DRIFTING IN DARKNESS.",
+  "KEEP POWER, AIR, AND PROCESSING",
+  "ALIVE WHILE YOU REPAIR THE SHIP.",
+  "RESTORE MAIN SYSTEMS AND ESCAPE."
+];
+const BRIEFING_LENGTH = BRIEFING_LINES.reduce((total, line) => total + line.length, 0);
+const repairImage = new Image();
+repairImage.addEventListener("load", () => {
+  if (briefingActive) drawBriefing();
+});
+repairImage.src = repairImageUrl;
 
 function clamp(value, low, high) {
   return Math.max(low, Math.min(high, value));
@@ -110,6 +154,31 @@ function gameInit() {
   deniedUntil = 0;
   announce("New game. Power selected.");
   drawScreen();
+}
+
+function startGame() {
+  if (!titleActive) return false;
+  titleActive = false;
+  briefingActive = true;
+  briefingChars = 0;
+  briefingStarted = performance.now();
+  titleScreen.classList.add("is-hidden");
+  drawBriefing();
+  canvas.focus({ preventScroll: true });
+  return true;
+}
+
+function advanceBriefing() {
+  if (!briefingActive) return false;
+  if (briefingChars < BRIEFING_LENGTH) {
+    briefingChars = BRIEFING_LENGTH;
+    drawBriefing();
+    return true;
+  }
+  briefingActive = false;
+  lastTime = performance.now();
+  gameInit();
+  return true;
 }
 
 function performAction(actionIndex = selected) {
@@ -318,9 +387,16 @@ function fillRect(x, y, width, height, color) {
   ctx.fillRect(x, y, width, height);
 }
 
+function fillRoundRect(x, y, width, height, radius, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.fill();
+}
+
 function textAt(text, x, y, color = C.text, align = "left") {
   ctx.fillStyle = color;
-  ctx.font = "8px monospace";
+  ctx.font = '700 8px "Arial Narrow", "Liberation Sans Narrow", "Lucida Console", monospace';
   ctx.textBaseline = "top";
   ctx.textAlign = align;
   ctx.fillText(text, x, y);
@@ -353,18 +429,18 @@ function drawStatusBoxes(value, x, y, color, rowBackground) {
   for (let cell = 0; cell < 10; cell++) {
     const cellX = x + cell * 8;
     if (cell < value) {
-      fillRect(cellX, y, 7, 6, color);
+      fillRoundRect(cellX, y, 7, 6, 2, color);
     } else {
-      fillRect(cellX, y, 7, 6, C.text);
-      fillRect(cellX + 1, y + 1, 5, 4, rowBackground);
+      fillRoundRect(cellX, y, 7, 6, 2, C.hint);
+      fillRoundRect(cellX + 1, y + 1, 5, 4, 1, rowBackground);
     }
   }
 }
 
 function drawScreen() {
   fillRect(0, 0, SCR_W, SCR_H, C.bg);
-  fillRect(4, 3, 312, 194, C.border);
-  fillRect(6, 5, 308, 190, C.win);
+  fillRoundRect(4, 3, 312, 194, 5, C.border);
+  fillRoundRect(6, 5, 308, 190, 4, C.win);
   textAt("KEY", 8, 8, C.hint);
   textAt("STATUS", 32, 8, C.hint);
   textAt("ACTION", 116, 8, C.hint);
@@ -383,10 +459,10 @@ function drawRows() {
     const rowBackground = C.win;
     if ((unlocked[i] && cooldown[i] > 0) || specialTimer[i] > 0) {
       const progress = specialTimer[i] > 0 ? specialTimer[i] / 20 : cooldown[i] / cooldownMax[i];
-      fillRect(112, y, Math.round(100 * progress), 14, C.cooldown);
+      fillRoundRect(112, y, Math.round(100 * progress), 14, 3, C.cooldown);
     }
     if ((systemLoadPwr[i] || systemLoadLif[i]) && loadSec > 0) {
-      fillRect(212, y, Math.round(72 * loadSec / 20), 14, C.loadProgress);
+      fillRoundRect(212, y, Math.round(72 * loadSec / 20), 14, 3, C.loadProgress);
     }
     if (isActionActive(i)) textAt(ACTION_KEYS[i], 8, y + 3, C.value);
     drawIcon(i, 20, y + 3);
@@ -455,25 +531,62 @@ function drawFooter() {
 }
 
 function drawEnd() {
-  fillRect(28, 54, 264, 94, C.border);
-  fillRect(30, 56, 260, 90, C.win);
-  const won = gameMode === 1;
-  if (won) {
-    textAt("ALL MAIN SYSTEMS ONLINE", 48, 68, C.online);
-    textAt("JUMP COURSE TO THE NEAREST", 48, 84, C.text);
-    textAt("SPACEPORT IS READY. YOU WIN!", 48, 96, C.text);
-  } else {
-    const endings = {
-      0: ["POWER SYSTEM FAILURE", "THE LIGHTS FAIL. AIR STALES.", "THE CREW FALLS SILENT."],
-      1: ["LIFE SUPPORT FAILURE", "THE AIR TURNS STALE.", "THE CREW DRIFTS TO SLEEP."],
-      2: ["PROCESSING FAILURE", "POWER CONTROL COLLAPSES.", "FIRE CONSUMES THE SHIP."]
-    };
-    const lines = endings[failureSystem] || ["SYSTEM FAILURE", "THE SHIP CAN NO LONGER", "CONTINUE ITS JOURNEY."];
-    textAt(lines[0], 48, 68, C.offline);
-    textAt(lines[1], 48, 84, C.text);
-    textAt(lines[2], 48, 96, C.text);
+  if (gameMode === 2) {
+    drawFailureImage();
+    return;
   }
-  textAt("PRESS FIRE TO RESTART", 76, 126, C.hint);
+
+  drawSuccessImage();
+}
+
+function drawSuccessImage() {
+  fillRoundRect(24, 0, 272, 200, 5, C.border);
+  if (successImage.complete && successImage.naturalWidth) {
+    ctx.drawImage(successImage, 28, 1, 264, 198);
+  }
+  fillRoundRect(32, 145, 256, 48, 3, "rgb(1 7 4 / 0.82)");
+  textAt("ALL MAIN SYSTEMS ONLINE", 40, 151, "#f2fff5");
+  textAt("JUMP COURSE LOCKED.", 40, 165, "#e5ffeb");
+  textAt("THE CREW ESCAPES THE ABYSS.", 40, 177, "#e5ffeb");
+}
+
+function drawFailureImage() {
+  fillRoundRect(24, 0, 272, 200, 5, C.border);
+  if (failureImage.complete && failureImage.naturalWidth) {
+    ctx.drawImage(failureImage, 28, 1, 264, 198);
+  }
+  fillRoundRect(32, 145, 256, 48, 3, "rgb(1 7 4 / 0.88)");
+  const lines = FAILURE_TEXT[failureSystem] ||
+    ["SYSTEM FAILURE", "THE SHIP CAN NO LONGER", "CONTINUE ITS JOURNEY."];
+  textAt(lines[0], 40, 151, C.offline);
+  textAt(lines[1], 40, 165, C.text);
+  textAt(lines[2], 40, 177, C.text);
+}
+
+function drawBriefing() {
+  fillRect(0, 0, SCR_W, SCR_H, C.bg);
+  if (repairImage.complete && repairImage.naturalWidth) {
+    ctx.drawImage(repairImage, 0, 0, SCR_W, SCR_H);
+  }
+  briefingTextAt("SHIP EMERGENCY LOG", 160, 12, "#f2fff5");
+
+  let remaining = Math.floor(briefingChars);
+  BRIEFING_LINES.forEach((line, index) => {
+    const visible = line.slice(0, Math.max(0, remaining));
+    briefingTextAt(visible, 160, 48 + index * 24, "#e5ffeb");
+    remaining -= line.length;
+  });
+  if (briefingChars >= BRIEFING_LENGTH) {
+    briefingTextAt("FIRE OR ENTER TO BEGIN", 160, 176, "#f2fff5");
+  }
+}
+
+function briefingTextAt(text, x, y, color) {
+  textAt(text, x - 1, y, "#010704", "center");
+  textAt(text, x + 1, y, "#010704", "center");
+  textAt(text, x, y - 1, "#010704", "center");
+  textAt(text, x, y + 1, "#010704", "center");
+  textAt(text, x, y, color, "center");
 }
 
 function drawStoryModal() {
@@ -484,8 +597,8 @@ function drawStoryModal() {
     3: ["SOURCE INSTALLED", "POWER OUTPUT IS NOW ENOUGH", "TO COMPLETE ALL REPAIRS."]
   };
   const lines = stories[storyType];
-  fillRect(28, 54, 264, 94, C.border);
-  fillRect(30, 56, 260, 90, C.win);
+  fillRoundRect(28, 54, 264, 94, 5, C.border);
+  fillRoundRect(30, 56, 260, 90, 4, C.win);
   textAt(lines[0], 48, 68, C.title);
   textAt(lines[1], 48, 86, C.text);
   textAt(lines[2], 48, 98, C.text);
@@ -498,15 +611,15 @@ function drawModificationModal() {
     auto: "RUNS ONE RESOURCE AUTOMATICALLY",
     speed: "HALVES ONE RESOURCE COOLDOWN"
   };
-  fillRect(20, 32, 280, 136, C.border);
-  fillRect(22, 34, 276, 132, C.win);
+  fillRoundRect(20, 32, 280, 136, 5, C.border);
+  fillRoundRect(22, 34, 276, 132, 4, C.win);
   textAt(`${modalType.toUpperCase()} MODIFICATION`, 36, 42, C.title);
   textAt(descriptions[modalType], 36, 53, C.hint);
   const mask = getMask(modalType);
   [0, 1, 2].forEach((index, option) => {
     const y = 70 + option * 24;
     const installed = Boolean(mask & (1 << index));
-    fillRect(32, y - 2, 256, 22, installed ? C.border : C.selected);
+    fillRoundRect(32, y - 2, 256, 22, 3, installed ? C.border : C.selected);
     if (!installed) textAt(ACTION_KEYS[index], 40, y, C.value);
     drawIcon(index, 56, y);
     textAt(NAMES[index], 70, y, installed ? C.hint : C.text);
@@ -560,6 +673,20 @@ function announce(message) {
 }
 
 document.addEventListener("keydown", event => {
+  if (titleActive) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      startGame();
+    }
+    return;
+  }
+  if (briefingActive) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      advanceBriefing();
+    }
+    return;
+  }
   const controls = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", " ": "fire", Enter: "fire" };
   const key = event.key.toLowerCase();
   if (storyType !== null) {
@@ -604,12 +731,22 @@ document.addEventListener("keyup", event => {
 
 document.querySelectorAll("[data-control]").forEach(button => {
   button.addEventListener("click", () => {
+    if (titleActive) {
+      if (button.dataset.control === "fire") startGame();
+      return;
+    }
+    if (briefingActive) {
+      if (button.dataset.control === "fire") advanceBriefing();
+      return;
+    }
     handleControl(button.dataset.control);
     canvas.focus({ preventScroll: true });
   });
 });
 
 canvas.addEventListener("click", event => {
+  if (startGame()) return;
+  if (advanceBriefing()) return;
   if (storyType !== null) {
     storyType = null;
     drawScreen();
@@ -622,15 +759,19 @@ canvas.addEventListener("click", event => {
   if (x >= 32 && x <= 288 && y >= 68 && y < 140) selectModification(Math.floor((y - 68) / 24));
 });
 
+titleScreen.addEventListener("click", startGame);
+
 function loop(now) {
   const delta = Math.min(now - lastTime, 1000);
   lastTime = now;
-  if (!gameMode && !modalType && storyType === null) {
+  if (briefingActive) {
+    briefingChars = Math.min(BRIEFING_LENGTH, (now - briefingStarted) * 0.018);
+    drawBriefing();
+  } else if (!titleActive && !gameMode && !modalType && storyType === null) {
     tickGame(delta / 1000);
   }
-  drawScreen();
+  if (!titleActive && !briefingActive) drawScreen();
   requestAnimationFrame(loop);
 }
 
-gameInit();
 requestAnimationFrame(loop);

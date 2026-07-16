@@ -3,16 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ravaged Space - VBXE Web Edition</title>
+  <title>Cosmic Abyss - VBXE Web Edition</title>
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
   <main class="console" aria-labelledby="game-title">
-    <h1 id="game-title" class="visually-hidden">Ravaged Space</h1>
+    <h1 id="game-title" class="visually-hidden">Cosmic Abyss</h1>
     <div class="screen-shell">
       <canvas id="screen" width="320" height="200" tabindex="0"
-        aria-label="Ravaged Space systems console"></canvas>
+        aria-label="Cosmic Abyss systems console"></canvas>
       <div class="scanlines" aria-hidden="true"></div>
+      <div id="title-screen" class="title-screen" aria-label="Cosmic Abyss title screen">
+        <img id="title-art" alt="A spacecraft engineer repairing a control panel">
+        <div class="title-copy">
+          <strong>COSMIC ABYSS</strong>
+          <span>PRESS FIRE OR ENTER TO START</span>
+        </div>
+      </div>
     </div>
 
     <div class="controller" aria-label="Game controls">

@@ -1,6 +1,6 @@
-# Ravaged Space
+# Cosmic Abyss
 
-Ravaged Space is a real-time spaceship survival game with two maintained
+Cosmic Abyss is a real-time spaceship survival game with two maintained
 implementations: an Atari 8-bit VBXE build and a browser version that mirrors
 the Atari rules and 320x200 systems console.
 

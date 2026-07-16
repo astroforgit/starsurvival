@@ -13,7 +13,7 @@
 ;   2. Text is not a hardware character mode either. A font "sheet" lives in VRAM
 ;      and each glyph is blitted into the framebuffer by the VBXE blitter, one
 ;      blit per character. To keep this file free of data blobs, the sheet is
-;      built at runtime from the Atari OS ROM charset at $E000 (see font_expand):
+;      built at runtime from a custom condensed 5x7 terminal face (see font_expand):
 ;      every glyph pixel becomes 255, every gap 0. Blitting with AND = colour then
 ;      stamps the glyph in any palette index you like -- one font, any colour.
 ;      (The real game bakes its font from the original UFO's SMALLSET.DAT the same
@@ -42,8 +42,9 @@
 SDMCTL   = $022F                ; OS shadow of DMACTL; the VBI copies it every frame
 COLOR4   = $02C8
 CH       = $02FC                ; OS keyboard scan-code shadow, $FF = no key
-CHARSET  = $E000                ; OS ROM charset: 128 glyphs x 8 bytes, internal order
+RTCLOK   = $12                  ; three-byte OS frame clock; RTCLOK+2 changes fastest
 PORTA    = $D300                ; joystick 0 in bits 0..3 (up, down, left, right; 0 = pushed)
+PORTB    = $D301                ; XL/XE memory control; bit 1 exposes RAM under BASIC
 STRIG0   = $D010
 DMACTL   = $D400
 VCOUNT   = $D40B
@@ -104,6 +105,7 @@ C_SELECT  = 15
 C_COOLDOWN = 16
 C_LOADPROG = 17
 C_ICON_BASE = 18
+C_NOISE   = 25                  ; faint phosphor grain; icon colours stay 18..24
 
 ; ---- game layout ----
 WIN_X   = 4
@@ -155,6 +157,9 @@ txt_ptr = $D7                   ; 2 - draw_text's string
 ?ok     lda #0
         sta SDMCTL              ; ANTIC playfield off. Setting the SHADOW is what
         sta DMACTL              ;   makes it stick: the OS VBI reloads DMACTL from it.
+        lda PORTB
+        ora #2                  ; shower artwork is loaded into RAM at $A000
+        sta PORTB
         lda #$90+MC_CPU         ; MEMAC-A: map a 4K VRAM window at $9000, CPU side
         sta VBXE_MEMAC_CTRL
         lda #0
@@ -165,6 +170,10 @@ txt_ptr = $D7                   ; 2 - draw_text's string
         jsr font_expand
         jsr icons_expand
         jsr enable_display
+        jsr draw_title_screen
+        jsr wait_title_input
+        jsr draw_briefing_screen
+        jsr wait_title_input
         jsr game_init
         jsr draw_screen
         jmp loop
@@ -206,6 +215,9 @@ special_sec dta 0,0,0,0,0,0,0
 special_frac dta 0,0,0,0,0,0,0
 story_type dta 0
 failure_system dta $FF
+relax_sec dta 0
+relax_done dta 0
+relax_release dta 0
 
 ; Per-action immediate deltas. Positive values repair the selected system;
 ; costs are subtracted explicitly in perform_action.
@@ -286,11 +298,26 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         sta modal_type
         sta amount_opened
         sta story_type
+        sta relax_done
+        sta relax_release
         sta old_stick
         lda #$FF
         sta failure_system
         lda #4
         sta load_sec
+        lda RTCLOK+2            ; choose 60..120 seconds from the live OS clock
+        eor RTCLOK+1
+        eor VCOUNT
+?relax_random
+        cmp #61
+        bcc ?relax_ready
+        sec
+        sbc #61
+        bcs ?relax_random
+?relax_ready
+        clc
+        adc #60
+        sta relax_sec
         ldx #6
 ?gain   lda base_gain,x
         sta gain_tab,x
@@ -397,6 +424,16 @@ initial_health dta 2,7,9,2,2,1,3
 .endp
 
 .proc read_story_keyboard
+        lda story_type
+        cmp #8
+        bne ?input
+        lda relax_release        ; do not instantly close if fire triggered the popup
+        bne ?input
+        lda STRIG0
+        beq ?done
+        lda #1
+        sta relax_release
+?input
         lda STRIG0
         beq ?close
         lda CH
@@ -832,6 +869,9 @@ mod_check_mask dta 0
         bcc ?r
         lda #0
         sta frame50
+        jsr tick_relaxation
+        lda story_type
+        bne ?r
         dec load_sec
 ?load   lda load_sec
         ; draw_progress already updates the narrow load strips every frame.
@@ -858,6 +898,25 @@ mod_check_mask dta 0
         jsr draw_rows
         jsr draw_footer
 ?r      rts
+.endp
+
+.proc tick_relaxation
+        lda relax_done
+        bne ?done
+        lda story_type           ; narrative screens pause the one-time timer
+        bne ?done
+        dec relax_sec
+        bne ?done
+        lda #1
+        sta relax_done
+        lda #0
+        sta relax_release
+        lda #$FF
+        sta CH
+        lda #8
+        sta story_type
+        jsr draw_relax_modal
+?done   rts
 .endp
 
 .proc tick_specials
@@ -1059,24 +1118,24 @@ xdl_len = * - xdl_data
 ?done   rts
 .endp
 pal_tab
-        dta 0,   8,  8, 16      ; background
-        dta 1, 168,192,240      ; _color+1  arrow
-        dta 2, 120,148,208      ; _color+2  bevel light
-        dta 3,  84,112,180      ; _color+3  (invert pivot)
-        dta 4,  52, 76,144      ; _color+4  face
-        dta 5,  28, 44,104      ; _color+5  bevel dark
-        dta 6,  20, 32, 80      ; window border
-        dta 7,  12, 20, 52      ; window face
-        dta 8, 236,236,236      ; text
-        dta 9, 216,180, 80      ; title
-        dta 10,248,208, 96      ; value
-        dta 11,120,120,140      ; hint
-        dta 12, 72,204,128      ; online
-        dta 13,232,184, 72      ; degraded
-        dta 14,224, 72, 72      ; offline/destroyed
-        dta 15, 36, 64,112      ; selected row
-        dta 16, 89, 98,125      ; animated action cooldown
-        dta 17, 48, 75,105      ; animated load cycle
+        dta 0,   1,  7,  4      ; near-black CRT surround
+        dta 1, 179,255,199      ; _color+1  bright phosphor arrow
+        dta 2,  83,255,139      ; _color+2  bevel light
+        dta 3,  45,200,103      ; _color+3  invert pivot
+        dta 4,  14, 82, 45      ; _color+4  button face
+        dta 5,   4, 36, 19      ; _color+5  bevel dark
+        dta 6,  31,184, 97      ; neon-green window border
+        dta 7,   3, 19, 11      ; dark-green window face
+        dta 8, 130,245,167      ; phosphor text
+        dta 9, 183,255,202      ; bright title
+        dta 10,141,255,174      ; active value
+        dta 11, 55,141, 89      ; dim hint
+        dta 12, 80,255,134      ; online
+        dta 13,183,217, 74      ; degraded
+        dta 14,255,110, 85      ; offline/destroyed
+        dta 15, 13, 59, 35      ; selected row
+        dta 16, 20, 82, 47      ; animated action cooldown
+        dta 17, 13, 62, 37      ; animated load cycle
         dta 18,248,208, 96      ; power bolt
         dta 19,232, 92,104      ; life-support heart
         dta 20,232,160, 96      ; processing core
@@ -1084,12 +1143,31 @@ pal_tab
         dta 22,112,200,192      ; guidance robot
         dta 23,232,144, 56      ; engines rocket
         dta 24,144,158,216      ; sensors dish
+        dta 25, 10, 46, 25      ; low-contrast CRT colour noise
+        dta 32,  0,  4,  1      ; title artwork: 16-step green ramp
+        dta 33,  1, 12,  2
+        dta 34,  2, 22,  4
+        dta 35,  3, 34,  6
+        dta 36,  5, 48,  8
+        dta 37,  7, 64, 11
+        dta 38, 10, 82, 14
+        dta 39, 14,102, 18
+        dta 40, 19,124, 23
+        dta 41, 25,148, 29
+        dta 42, 33,174, 37
+        dta 43, 44,200, 47
+        dta 44, 58,222, 58
+        dta 45, 78,238, 72
+        dta 46,108,250, 88
+        dta 47,154,255,112
+        dta 48,224,255,232      ; bright briefing body text
+        dta 49,246,255,248      ; near-white briefing title/prompt
         dta $FF
 
 ;=============================================================================
-; font_expand - OS ROM charset -> an 8-bit "mask" font sheet in VRAM $038000.
-;   ASCII 32..95 maps to Atari internal codes 0..63 by simply subtracting 32, so
-;   glyph gi lives at CHARSET + gi*8 (8 bytes, 1 bit per pixel, MSB = leftmost).
+; font_expand - condensed 5x7 terminal charset -> an 8-bit mask font sheet.
+;   ASCII 32..95 maps to glyphs 0..63 by subtracting 32. The narrow source face
+;   matches the web UI more closely than the wide Atari OS ROM character set.
 ;   Each is expanded to 8x8 bytes of 255/0 and padded to a 64-byte cell, so the
 ;   blitter's source address is base + (gi<<6) with no multiply. 64 cells x 64 B
 ;   is exactly one 4K bank, which is why the whole sheet fits one window select.
@@ -1101,9 +1179,9 @@ bits    dta 0
 .proc font_expand
         lda #BANK_EN+FONT_BANK
         sta VBXE_BANK_SEL
-        lda #<CHARSET
+        lda #<terminal_font
         sta srcp
-        lda #>CHARSET
+        lda #>terminal_font
         sta srcp+1
         lda #<MEMW
         sta dstp
@@ -1152,6 +1230,74 @@ bits    dta 0
         rts
 ?sy     dta 0
 .endp
+
+; Five-pixel-wide uppercase terminal face centred in each 8x8 cell. Each glyph
+; has a blank baseline row and is stored in ASCII order from space through '_'.
+terminal_font
+        dta $00,$00,$00,$00,$00,$00,$00,$00 ; 32 space
+        dta $10,$10,$10,$10,$10,$00,$10,$00 ; !
+        dta $28,$28,$28,$00,$00,$00,$00,$00 ; "
+        dta $28,$28,$7C,$28,$7C,$28,$28,$00 ; #
+        dta $10,$3C,$50,$38,$14,$78,$10,$00 ; $
+        dta $64,$68,$10,$20,$4C,$1C,$00,$00 ; %
+        dta $30,$48,$30,$54,$48,$34,$00,$00 ; &
+        dta $10,$10,$20,$00,$00,$00,$00,$00 ; '
+        dta $08,$10,$20,$20,$20,$10,$08,$00 ; (
+        dta $20,$10,$08,$08,$08,$10,$20,$00 ; )
+        dta $00,$54,$38,$7C,$38,$54,$00,$00 ; *
+        dta $00,$10,$10,$7C,$10,$10,$00,$00 ; +
+        dta $00,$00,$00,$00,$00,$10,$10,$20 ; comma
+        dta $00,$00,$00,$7C,$00,$00,$00,$00 ; -
+        dta $00,$00,$00,$00,$00,$00,$10,$00 ; period
+        dta $04,$08,$10,$20,$40,$00,$00,$00 ; /
+        dta $38,$44,$4C,$54,$64,$44,$38,$00 ; 0
+        dta $10,$30,$10,$10,$10,$10,$38,$00 ; 1
+        dta $38,$44,$04,$08,$10,$20,$7C,$00 ; 2
+        dta $78,$04,$04,$38,$04,$04,$78,$00 ; 3
+        dta $08,$18,$28,$48,$7C,$08,$08,$00 ; 4
+        dta $7C,$40,$40,$78,$04,$04,$78,$00 ; 5
+        dta $38,$40,$40,$78,$44,$44,$38,$00 ; 6
+        dta $7C,$04,$08,$10,$20,$20,$20,$00 ; 7
+        dta $38,$44,$44,$38,$44,$44,$38,$00 ; 8
+        dta $38,$44,$44,$3C,$04,$04,$38,$00 ; 9
+        dta $00,$10,$00,$00,$10,$00,$00,$00 ; :
+        dta $00,$10,$00,$00,$10,$10,$20,$00 ; ;
+        dta $08,$10,$20,$40,$20,$10,$08,$00 ; <
+        dta $00,$00,$7C,$00,$7C,$00,$00,$00 ; =
+        dta $20,$10,$08,$04,$08,$10,$20,$00 ; >
+        dta $38,$44,$04,$08,$10,$00,$10,$00 ; ?
+        dta $38,$44,$5C,$54,$5C,$40,$38,$00 ; @
+        dta $38,$44,$44,$7C,$44,$44,$44,$00 ; A
+        dta $78,$44,$44,$78,$44,$44,$78,$00 ; B
+        dta $38,$44,$40,$40,$40,$44,$38,$00 ; C
+        dta $70,$48,$44,$44,$44,$48,$70,$00 ; D
+        dta $7C,$40,$40,$78,$40,$40,$7C,$00 ; E
+        dta $7C,$40,$40,$78,$40,$40,$40,$00 ; F
+        dta $38,$44,$40,$5C,$44,$44,$38,$00 ; G
+        dta $44,$44,$44,$7C,$44,$44,$44,$00 ; H
+        dta $38,$10,$10,$10,$10,$10,$38,$00 ; I
+        dta $1C,$08,$08,$08,$08,$48,$30,$00 ; J
+        dta $44,$48,$50,$60,$50,$48,$44,$00 ; K
+        dta $40,$40,$40,$40,$40,$40,$7C,$00 ; L
+        dta $44,$6C,$54,$54,$44,$44,$44,$00 ; M
+        dta $44,$64,$54,$4C,$44,$44,$44,$00 ; N
+        dta $38,$44,$44,$44,$44,$44,$38,$00 ; O
+        dta $78,$44,$44,$78,$40,$40,$40,$00 ; P
+        dta $38,$44,$44,$44,$54,$48,$34,$00 ; Q
+        dta $78,$44,$44,$78,$50,$48,$44,$00 ; R
+        dta $38,$44,$40,$38,$04,$44,$38,$00 ; S
+        dta $7C,$10,$10,$10,$10,$10,$10,$00 ; T
+        dta $44,$44,$44,$44,$44,$44,$38,$00 ; U
+        dta $44,$44,$44,$44,$44,$28,$10,$00 ; V
+        dta $44,$44,$44,$54,$54,$6C,$44,$00 ; W
+        dta $44,$44,$28,$10,$28,$44,$44,$00 ; X
+        dta $44,$44,$28,$10,$10,$10,$10,$00 ; Y
+        dta $7C,$04,$08,$10,$20,$40,$7C,$00 ; Z
+        dta $38,$20,$20,$20,$20,$20,$38,$00 ; [
+        dta $40,$20,$10,$08,$04,$00,$00,$00 ; backslash
+        dta $38,$08,$08,$08,$08,$08,$38,$00 ; ]
+        dta $10,$28,$44,$00,$00,$00,$00,$00 ; ^
+        dta $00,$00,$00,$00,$00,$00,$7C,$00 ; _
 
 ; Seven custom 8x8 icons, shared pixel-for-pixel with src/game.js. They are
 ; expanded once into coloured VBXE sprites; zero remains transparent.
@@ -1376,6 +1522,184 @@ fr_col  dta 0
         jmp do_blit
 .endp
 
+; Rounded filled rectangle for the VBXE framebuffer. Three overlapping fills
+; produce two stepped corner pixels, which reads as a soft 3px radius at 320x200.
+rr_x    dta a(0)
+rr_y    dta 0
+rr_w    dta a(0)
+rr_h    dta 0
+rr_col  dta 0
+.proc fill_round_rect
+        lda calc_x
+        sta rr_x
+        lda calc_x+1
+        sta rr_x+1
+        lda calc_y
+        sta rr_y
+        lda fr_w
+        sta rr_w
+        lda fr_w+1
+        sta rr_w+1
+        lda fr_h
+        sta rr_h
+        lda fr_col
+        sta rr_col
+
+        ; Top/bottom strip: inset two pixels.
+        lda rr_x
+        clc
+        adc #2
+        sta calc_x
+        lda rr_x+1
+        adc #0
+        sta calc_x+1
+        lda rr_y
+        sta calc_y
+        lda rr_w
+        sec
+        sbc #4
+        sta fr_w
+        lda rr_w+1
+        sbc #0
+        sta fr_w+1
+        lda rr_h
+        sta fr_h
+        lda rr_col
+        sta fr_col
+        jsr fill_rect
+
+        ; Second strip: inset one pixel on every side.
+        lda rr_x
+        clc
+        adc #1
+        sta calc_x
+        lda rr_x+1
+        adc #0
+        sta calc_x+1
+        lda rr_y
+        clc
+        adc #1
+        sta calc_y
+        lda rr_w
+        sec
+        sbc #2
+        sta fr_w
+        lda rr_w+1
+        sbc #0
+        sta fr_w+1
+        lda rr_h
+        sec
+        sbc #2
+        sta fr_h
+        jsr fill_rect
+
+        ; Full-width centre strip.
+        lda rr_x
+        sta calc_x
+        lda rr_x+1
+        sta calc_x+1
+        lda rr_y
+        clc
+        adc #2
+        sta calc_y
+        lda rr_w
+        sta fr_w
+        lda rr_w+1
+        sta fr_w+1
+        lda rr_h
+        sec
+        sbc #4
+        sta fr_h
+        jsr fill_rect
+
+        ; Restore the caller's rectangle parameters.
+        lda rr_x
+        sta calc_x
+        lda rr_x+1
+        sta calc_x+1
+        lda rr_y
+        sta calc_y
+        lda rr_w
+        sta fr_w
+        lda rr_w+1
+        sta fr_w+1
+        lda rr_h
+        sta fr_h
+        lda rr_col
+        sta fr_col
+        rts
+.endp
+
+; One-pixel corner cut for small parameter points. Unlike fill_round_rect's
+; larger radius, a 7x6 cell keeps a five-pixel top/bottom edge and a broad body,
+; so it reads as a rounded rectangle instead of a circle.
+.proc fill_round_cell
+        lda calc_x
+        sta rr_x
+        lda calc_x+1
+        sta rr_x+1
+        lda calc_y
+        sta rr_y
+        lda fr_w
+        sta rr_w
+        lda fr_w+1
+        sta rr_w+1
+        lda fr_h
+        sta rr_h
+        lda fr_col
+        sta rr_col
+
+        lda rr_x
+        clc
+        adc #1
+        sta calc_x
+        lda rr_x+1
+        adc #0
+        sta calc_x+1
+        lda rr_w
+        sec
+        sbc #2
+        sta fr_w
+        lda rr_w+1
+        sbc #0
+        sta fr_w+1
+        jsr fill_rect
+
+        lda rr_x
+        sta calc_x
+        lda rr_x+1
+        sta calc_x+1
+        lda rr_y
+        clc
+        adc #1
+        sta calc_y
+        lda rr_w
+        sta fr_w
+        lda rr_w+1
+        sta fr_w+1
+        lda rr_h
+        sec
+        sbc #2
+        sta fr_h
+        jsr fill_rect
+
+        lda rr_x
+        sta calc_x
+        lda rr_x+1
+        sta calc_x+1
+        lda rr_y
+        sta calc_y
+        lda rr_w
+        sta fr_w
+        lda rr_w+1
+        sta fr_w+1
+        lda rr_h
+        sta fr_h
+        lda rr_col
+        sta fr_col
+        rts
+.endp
+
 ;=============================================================================
 ; text
 ;=============================================================================
@@ -1431,8 +1755,8 @@ text_col dta 0
         lda #1
         sta bl_mode             ; transparent: an output byte of 0 leaves the pixel
         jsr do_blit
-        lda text_x              ; fixed 8px advance (the game's font is proportional
-        clc                     ;   and carries a width table; the ROM charset is not)
+        lda text_x              ; fixed 8px cell advance for the condensed face
+        clc
         adc #8
         sta text_x
         bcc ?nc
@@ -1585,6 +1909,753 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
 .endp
 
 ;=============================================================================
+; packed artwork
+; The title and game-over illustrations use packed 4-bit grayscale. Each source
+; pixel expands to a 2x2 VBXE block and indexes the dedicated green ramp 32..47.
+;=============================================================================
+title_bank     dta 0
+title_rows     dta 0
+title_cols     dta 0
+title_packed   dta 0
+title_row_src  dta a(0)
+title_next_src dta a(0)
+
+.proc title_put_pixel
+        ldy #0
+        sta (dstp),y
+        inc dstp
+        bne ?done
+        inc dstp+1
+        lda dstp+1
+        cmp #$A0
+        bne ?done
+        lda #$90
+        sta dstp+1
+        inc title_bank
+        lda title_bank
+        ora #BANK_EN
+        sta VBXE_BANK_SEL
+?done   rts
+.endp
+
+.proc expand_title_row
+        lda #80                 ; 160 pixels, two packed per byte
+        sta title_cols
+?byte  ldy #0
+        lda (srcp),y
+        sta title_packed
+        inc srcp
+        bne ?source_ok
+        inc srcp+1
+?source_ok
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        ora #32
+        jsr title_put_pixel
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        ora #32
+        jsr title_put_pixel
+        lda title_packed
+        and #$0F
+        ora #32
+        jsr title_put_pixel
+        lda title_packed
+        and #$0F
+        ora #32
+        jsr title_put_pixel
+        dec title_cols
+        bne ?byte
+        rts
+.endp
+
+brief_palette dta 34,39,44,47
+
+.proc expand_briefing_row
+        lda #40                 ; 160 two-bit pixels, four packed per byte
+        sta title_cols
+?byte  ldy #0
+        lda (srcp),y
+        sta title_packed
+        inc srcp
+        bne ?source_ok
+        inc srcp+1
+?source_ok
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        and #3
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+
+        lda title_packed
+        lsr
+        lsr
+        and #3
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+
+        lda title_packed
+        and #3
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+        dec title_cols
+        bne ?byte
+        rts
+.endp
+
+.proc expand_failure_row
+        lda #66                 ; 132 pixels, two packed per byte
+        sta title_cols
+?byte  ldy #0
+        lda (srcp),y
+        sta title_packed
+        inc srcp
+        bne ?source_ok
+        inc srcp+1
+?source_ok
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        ora #32
+        jsr title_put_pixel
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        ora #32
+        jsr title_put_pixel
+        lda title_packed
+        and #$0F
+        ora #32
+        jsr title_put_pixel
+        lda title_packed
+        and #$0F
+        ora #32
+        jsr title_put_pixel
+        dec title_cols
+        bne ?byte
+        rts
+.endp
+
+.proc advance_failure_row
+        lda dstp
+        clc
+        adc #56                 ; 320-byte framebuffer row - 264 image pixels
+        sta dstp
+        bcc ?done
+        inc dstp+1
+        lda dstp+1
+        cmp #$A0
+        bne ?done
+        lda #$90
+        sta dstp+1
+        inc title_bank
+        lda title_bank
+        ora #BANK_EN
+        sta VBXE_BANK_SEL
+?done   rts
+.endp
+
+.proc draw_failure_bitmap
+        jsr wait_blit
+        lda #0
+        sta title_bank
+        lda #BANK_EN
+        sta VBXE_BANK_SEL
+        lda #<$915C             ; framebuffer (28, 1)
+        sta dstp
+        lda #>$915C
+        sta dstp+1
+        lda #99
+        sta title_rows
+?row   lda srcp
+        sta title_row_src
+        lda srcp+1
+        sta title_row_src+1
+        jsr expand_failure_row
+        jsr advance_failure_row
+        lda srcp
+        sta title_next_src
+        lda srcp+1
+        sta title_next_src+1
+        lda title_row_src
+        sta srcp
+        lda title_row_src+1
+        sta srcp+1
+        jsr expand_failure_row
+        jsr advance_failure_row
+        lda title_next_src
+        sta srcp
+        lda title_next_src+1
+        sta srcp+1
+        dec title_rows
+        bne ?row
+        lda #0
+        sta VBXE_BANK_SEL
+        rts
+.endp
+
+.proc draw_success_bitmap
+        jsr wait_blit
+        lda #0
+        sta title_bank
+        lda #BANK_EN
+        sta VBXE_BANK_SEL
+        lda #<$915C             ; framebuffer (28, 1)
+        sta dstp
+        lda #>$915C
+        sta dstp+1
+        lda #99
+        sta title_rows
+?row   lda srcp
+        sta title_row_src
+        lda srcp+1
+        sta title_row_src+1
+        jsr expand_success_row
+        jsr advance_failure_row
+        lda srcp
+        sta title_next_src
+        lda srcp+1
+        sta title_next_src+1
+        lda title_row_src
+        sta srcp
+        lda title_row_src+1
+        sta srcp+1
+        jsr expand_success_row
+        jsr advance_failure_row
+        lda title_next_src
+        sta srcp
+        lda title_next_src+1
+        sta srcp+1
+        dec title_rows
+        bne ?row
+        lda #0
+        sta VBXE_BANK_SEL
+        rts
+.endp
+
+.proc draw_relax_modal
+        lda #24
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        sta calc_y
+        lda #272&255
+        sta fr_w
+        lda #272/256
+        sta fr_w+1
+        lda #200
+        sta fr_h
+        lda #C_BORDER
+        sta fr_col
+        jsr fill_round_rect
+
+        lda #<shower_bitmap
+        sta srcp
+        lda #>shower_bitmap
+        sta srcp+1
+        jsr draw_success_bitmap
+
+        lda #32
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #132
+        sta calc_y
+        lda #256&255
+        sta fr_w
+        lda #256/256
+        sta fr_w+1
+        lda #64
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_round_rect
+
+        lda #40
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #139
+        sta text_y
+        lda #<s_relax_line1
+        ldx #>s_relax_line1
+        ldy #49
+        jsr text_at
+        lda #40
+        sta text_x
+        lda #153
+        sta text_y
+        lda #<s_relax_line2
+        ldx #>s_relax_line2
+        ldy #48
+        jsr text_at
+        lda #40
+        sta text_x
+        lda #165
+        sta text_y
+        lda #<s_relax_line3
+        ldx #>s_relax_line3
+        ldy #48
+        jsr text_at
+        lda #168
+        sta text_x
+        lda #182
+        sta text_y
+        lda #<s_continue
+        ldx #>s_continue
+        ldy #C_HINT
+        jmp text_at
+.endp
+
+.proc expand_success_row
+        lda #33                 ; 132 two-bit pixels, four packed per byte
+        sta title_cols
+?byte  ldy #0
+        lda (srcp),y
+        sta title_packed
+        inc srcp
+        bne ?source_ok
+        inc srcp+1
+?source_ok
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda title_packed
+        lsr
+        lsr
+        lsr
+        lsr
+        and #3
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda title_packed
+        lsr
+        lsr
+        and #3
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda title_packed
+        and #3
+        tax
+        lda brief_palette,x
+        jsr title_put_pixel
+        lda brief_palette,x
+        jsr title_put_pixel
+        dec title_cols
+        bne ?byte
+        rts
+.endp
+
+.proc draw_title_screen
+        lda #0
+        sta title_bank
+        lda #BANK_EN
+        sta VBXE_BANK_SEL
+        lda #<title_bitmap
+        sta srcp
+        lda #>title_bitmap
+        sta srcp+1
+        lda #<MEMW
+        sta dstp
+        lda #>MEMW
+        sta dstp+1
+        lda #100
+        sta title_rows
+?row   lda srcp
+        sta title_row_src
+        lda srcp+1
+        sta title_row_src+1
+        jsr expand_briefing_row
+        lda srcp
+        sta title_next_src
+        lda srcp+1
+        sta title_next_src+1
+        lda title_row_src
+        sta srcp
+        lda title_row_src+1
+        sta srcp+1
+        jsr expand_briefing_row
+        lda title_next_src
+        sta srcp
+        lda title_next_src+1
+        sta srcp+1
+        dec title_rows
+        bne ?row
+        lda #0
+        sta VBXE_BANK_SEL
+
+        ; Dark rounded labels keep the game title and prompt readable over art.
+        lda #100
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #5
+        sta calc_y
+        lda #120
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #14
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_round_rect
+        lda #108
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #8
+        sta text_y
+        lda #<s_game_title
+        ldx #>s_game_title
+        ldy #C_TITLE
+        jsr text_at
+
+        lda #68
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #178
+        sta calc_y
+        lda #184
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #17
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_round_rect
+        lda #76
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #183
+        sta text_y
+        lda #<s_title_start
+        ldx #>s_title_start
+        ldy #C_VALUE
+        jmp text_at
+.endp
+
+brief_ptr dta a(0)
+brief_glyph dta 0
+brief_x dta a(0)
+brief_y dta 0
+brief_text_col dta 48
+
+.proc draw_brief_glyph
+        sta brief_glyph
+        lda text_x
+        sta brief_x
+        lda text_x+1
+        sta brief_x+1
+        lda text_y
+        sta brief_y
+
+        lda #32                 ; near-black artwork colour used as an outline
+        sta text_col
+        lda brief_x
+        sec
+        sbc #1
+        sta text_x
+        lda brief_x+1
+        sbc #0
+        sta text_x+1
+        lda brief_y
+        sta text_y
+        lda brief_glyph
+        jsr draw_char
+
+        lda brief_x
+        clc
+        adc #1
+        sta text_x
+        lda brief_x+1
+        adc #0
+        sta text_x+1
+        lda brief_y
+        sta text_y
+        lda brief_glyph
+        jsr draw_char
+
+        lda brief_x
+        sta text_x
+        lda brief_x+1
+        sta text_x+1
+        lda brief_y
+        sec
+        sbc #1
+        sta text_y
+        lda brief_glyph
+        jsr draw_char
+
+        lda brief_x
+        sta text_x
+        lda brief_x+1
+        sta text_x+1
+        lda brief_y
+        clc
+        adc #1
+        sta text_y
+        lda brief_glyph
+        jsr draw_char
+
+        lda brief_x
+        sta text_x
+        lda brief_x+1
+        sta text_x+1
+        lda brief_y
+        sta text_y
+        lda brief_text_col
+        sta text_col
+        lda brief_glyph
+        jmp draw_char
+.endp
+
+.proc draw_brief_text
+        lda txt_ptr
+        sta brief_ptr
+        lda txt_ptr+1
+        sta brief_ptr+1
+?char  lda brief_ptr
+        sta txt_ptr
+        lda brief_ptr+1
+        sta txt_ptr+1
+        ldy #0
+        lda (txt_ptr),y
+        beq ?done
+        sec
+        sbc #32
+        jsr draw_brief_glyph
+        inc brief_ptr
+        bne ?char
+        inc brief_ptr+1
+        jmp ?char
+?done  rts
+.endp
+
+.proc type_brief_line
+        lda txt_ptr
+        sta brief_ptr
+        lda txt_ptr+1
+        sta brief_ptr+1
+?char  lda brief_ptr
+        sta txt_ptr
+        lda brief_ptr+1
+        sta txt_ptr+1
+        ldy #0
+        lda (txt_ptr),y
+        beq ?done
+        sec
+        sbc #32
+        jsr draw_brief_glyph
+        inc brief_ptr
+        bne ?wait
+        inc brief_ptr+1
+?wait
+        jsr wait_frame
+        jsr wait_frame
+        jsr wait_frame
+        jmp ?char
+?done  rts
+.endp
+
+.proc draw_briefing_screen
+        jsr wait_blit
+        lda #0
+        sta title_bank
+        lda #BANK_EN
+        sta VBXE_BANK_SEL
+        lda #<briefing_bitmap
+        sta srcp
+        lda #>briefing_bitmap
+        sta srcp+1
+        lda #<MEMW
+        sta dstp
+        lda #>MEMW
+        sta dstp+1
+        lda #100
+        sta title_rows
+?row   lda srcp
+        sta title_row_src
+        lda srcp+1
+        sta title_row_src+1
+        jsr expand_briefing_row
+        lda srcp
+        sta title_next_src
+        lda srcp+1
+        sta title_next_src+1
+        lda title_row_src
+        sta srcp
+        lda title_row_src+1
+        sta srcp+1
+        jsr expand_briefing_row
+        lda title_next_src
+        sta srcp
+        lda title_next_src+1
+        sta srcp+1
+        dec title_rows
+        bne ?row
+        lda #0
+        sta VBXE_BANK_SEL
+
+        lda #88
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #12
+        sta text_y
+        lda #<s_brief_title
+        sta txt_ptr
+        lda #>s_brief_title
+        sta txt_ptr+1
+        lda #49
+        sta brief_text_col
+        jsr draw_brief_text
+
+        lda #48
+        sta brief_text_col
+        lda #52
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #48
+        sta text_y
+        lda #<s_brief_line1
+        sta txt_ptr
+        lda #>s_brief_line1
+        sta txt_ptr+1
+        jsr type_brief_line
+        lda #36
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #72
+        sta text_y
+        lda #<s_brief_line2
+        sta txt_ptr
+        lda #>s_brief_line2
+        sta txt_ptr+1
+        jsr type_brief_line
+        lda #36
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #96
+        sta text_y
+        lda #<s_brief_line3
+        sta txt_ptr
+        lda #>s_brief_line3
+        sta txt_ptr+1
+        jsr type_brief_line
+        lda #32
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #120
+        sta text_y
+        lda #<s_brief_line4
+        sta txt_ptr
+        lda #>s_brief_line4
+        sta txt_ptr+1
+        jsr type_brief_line
+        lda #32
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #144
+        sta text_y
+        lda #<s_brief_line5
+        sta txt_ptr
+        lda #>s_brief_line5
+        sta txt_ptr+1
+        jsr type_brief_line
+
+        lda #64
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #176
+        sta text_y
+        lda #<s_brief_start
+        sta txt_ptr
+        lda #>s_brief_start
+        sta txt_ptr+1
+        lda #49
+        sta brief_text_col
+        jmp draw_brief_text
+.endp
+
+.proc wait_title_input
+        lda #$FF
+        sta CH
+?release
+        jsr wait_frame
+        lda STRIG0
+        beq ?release
+?wait   jsr wait_frame
+        lda STRIG0
+        beq ?start
+        lda CH
+        cmp #$FF
+        beq ?wait
+?start  lda #$FF
+        sta CH
+        rts
+.endp
+
+;=============================================================================
 ; the screen
 ;=============================================================================
 .proc draw_screen
@@ -1614,7 +2685,7 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #WIN_X+2            ; ...around an inset face. (The game blits a crop of
         sta calc_x              ;   the original BACK*.SCR artwork in here instead.)
         lda #0
@@ -1629,10 +2700,11 @@ dn_ops                          ; :153-175  ARROW_BIG_DOWN
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         jsr draw_headers
         jsr draw_rows
-        jmp draw_footer
+        jsr draw_footer
+        jmp draw_crt_noise
 .endp
 
 .proc draw_headers
@@ -1912,11 +2984,11 @@ status_col dta 0
         bcs ?empty
         lda status_col
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_cell
         jmp ?next
 ?empty  lda #C_TEXT
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_cell
         inc calc_x
         inc calc_y
         lda #5
@@ -2502,6 +3574,50 @@ tiny_colour dta C_TEXT
         jmp draw_tiny_legend_item
 .endp
 
+; A fixed, sparse phosphor pattern keeps the interface legible while breaking up
+; the perfectly flat framebuffer. Points sit mainly in the gaps between rows.
+noise_idx dta 0
+.proc draw_crt_noise
+        lda #2
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #1
+        sta fr_h
+        lda #C_NOISE
+        sta fr_col
+        lda #0
+        sta noise_idx
+?point ldx noise_idx
+        lda crt_noise_points+2,x
+        cmp #$FF
+        beq ?done
+        sta calc_y
+        lda crt_noise_points,x
+        sta calc_x
+        lda crt_noise_points+1,x
+        sta calc_x+1
+        jsr fill_rect
+        lda noise_idx
+        clc
+        adc #3
+        sta noise_idx
+        bne ?point
+?done   rts
+.endp
+
+crt_noise_points
+        dta a(16),17,  a(74),17,  a(158),17, a(242),17, a(304),17
+        dta a(58),31,  a(137),31, a(263),31
+        dta a(18),47,  a(186),47, a(302),47
+        dta a(92),63,  a(230),63
+        dta a(44),79,  a(169),79, a(276),79
+        dta a(121),95, a(248),95
+        dta a(67),111, a(193),111, a(304),127
+        dta a(35),137, a(152),142, a(282),133
+        dta a(20),173, a(103),181, a(251),177, a(300),184
+        dta 0,0,$FF
+
 .proc draw_denied
         lda #HINT_X
         sta text_x
@@ -2516,6 +3632,189 @@ tiny_colour dta C_TEXT
 .endp
 
 .proc draw_end
+        lda game_mode
+        cmp #2
+        bne ?check_success
+        jmp ?lost_image
+?check_success
+        cmp #1
+        beq ?success_image
+        jmp ?text_box
+?success_image
+        lda #24
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        sta calc_y
+        lda #272&255
+        sta fr_w
+        lda #272/256
+        sta fr_w+1
+        lda #200
+        sta fr_h
+        lda #C_BORDER
+        sta fr_col
+        jsr fill_round_rect
+
+        lda #<success_bitmap
+        sta srcp
+        lda #>success_bitmap
+        sta srcp+1
+        jsr draw_success_bitmap
+
+        lda #32
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #145
+        sta calc_y
+        lda #256&255
+        sta fr_w
+        lda #256/256
+        sta fr_w+1
+        lda #48
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_round_rect
+
+        lda #40
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #151
+        sta text_y
+        lda #<s_win_title
+        ldx #>s_win_title
+        ldy #49
+        jsr text_at
+        lda #40
+        sta text_x
+        lda #165
+        sta text_y
+        lda #<s_success_line1
+        ldx #>s_success_line1
+        ldy #48
+        jsr text_at
+        lda #40
+        sta text_x
+        lda #177
+        sta text_y
+        lda #<s_success_line2
+        ldx #>s_success_line2
+        ldy #48
+        jmp text_at
+?lost_image
+        lda failure_system
+        cmp #3
+        bcc ?valid_image
+        jmp ?text_box
+?valid_image
+
+        lda #24
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #0
+        sta calc_y
+        lda #272&255
+        sta fr_w
+        lda #272/256
+        sta fr_w+1
+        lda #200
+        sta fr_h
+        lda #C_BORDER
+        sta fr_col
+        jsr fill_round_rect
+
+        ldx failure_system
+        lda failure_image_lo,x
+        sta srcp
+        lda failure_image_hi,x
+        sta srcp+1
+        jsr draw_failure_bitmap
+
+        lda #32
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #145
+        sta calc_y
+        lda #256&255
+        sta fr_w
+        lda #256/256
+        sta fr_w+1
+        lda #48
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_round_rect
+
+        lda #40
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #151
+        sta text_y
+        ldx failure_system
+        cpx #0
+        bne ?image_life
+        lda #<s_power_fail
+        ldx #>s_power_fail
+        bne ?image_title
+?image_life
+        cpx #1
+        bne ?image_processing
+        lda #<s_life_fail
+        ldx #>s_life_fail
+        bne ?image_title
+?image_processing
+        lda #<s_processing_fail
+        ldx #>s_processing_fail
+?image_title
+        ldy #C_OFFLINE
+        jsr text_at
+        lda #40
+        sta text_x
+        lda #165
+        sta text_y
+        lda failure_system
+        cmp #0
+        bne ?image_life_lines
+        lda #<s_power_line1
+        ldx #>s_power_line1
+        jsr ?image_line1
+        lda #<s_power_line2
+        ldx #>s_power_line2
+        bne ?image_line2
+?image_life_lines
+        cmp #1
+        bne ?image_process_lines
+        lda #<s_life_line1
+        ldx #>s_life_line1
+        jsr ?image_line1
+        lda #<s_life_line2
+        ldx #>s_life_line2
+        bne ?image_line2
+?image_process_lines
+        lda #<s_process_line1
+        ldx #>s_process_line1
+        jsr ?image_line1
+        lda #<s_process_line2
+        ldx #>s_process_line2
+?image_line2
+        ldy #C_TEXT
+        jmp text_at
+?image_line1
+        ldy #C_TEXT
+        jsr text_at
+        lda #40
+        sta text_x
+        lda #177
+        sta text_y
+        rts
+
+?text_box
         lda #28
         sta calc_x
         lda #0
@@ -2530,7 +3829,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #30
         sta calc_x
         lda #56
@@ -2543,7 +3842,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #48
         sta text_x
         lda #0
@@ -2572,8 +3871,7 @@ tiny_colour dta C_TEXT
         lda #<s_win_line2
         ldx #>s_win_line2
         ldy #C_TEXT
-        jsr text_at
-        jmp ?restart
+        jmp text_at
 ?lost   ldx failure_system
         cpx #0
         bne ?life
@@ -2618,8 +3916,7 @@ tiny_colour dta C_TEXT
         lda #<s_process_line2
         ldx #>s_process_line2
 ?line2  ldy #C_TEXT
-        jsr text_at
-        jmp ?restart
+        jmp text_at
 ?line1  ldy #C_TEXT
         jsr text_at
         lda #48
@@ -2627,17 +3924,6 @@ tiny_colour dta C_TEXT
         lda #96
         sta text_y
         rts
-?restart
-        lda #76
-        sta text_x
-        lda #0
-        sta text_x+1
-        lda #126
-        sta text_y
-        lda #<s_restart
-        ldx #>s_restart
-        ldy #C_HINT
-        jmp text_at
 .endp
 
 .proc draw_story_modal
@@ -2710,7 +3996,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #30
         sta calc_x
         lda #56
@@ -2723,7 +4009,7 @@ tiny_colour dta C_TEXT
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jmp fill_rect
+        jmp fill_round_rect
 .endp
 
 modal_idx dta 0
@@ -2744,7 +4030,7 @@ modal_mask dta 0
         sta fr_h
         lda #C_BORDER
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #22
         sta calc_x
         lda #34
@@ -2757,7 +4043,7 @@ modal_mask dta 0
         sta fr_h
         lda #C_WIN
         sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda #36
         sta text_x
         lda #0
@@ -2837,7 +4123,7 @@ modal_mask dta 0
         beq ?face
         lda #C_BORDER
 ?face   sta fr_col
-        jsr fill_rect
+        jsr fill_round_rect
         lda ?installed
         bne ?icon
         lda #40
@@ -3034,10 +4320,15 @@ s_jump_title dta c'JUMPDRIVE ACTIVATED',0
 s_source_title dta c'SOURCE INSTALLED',0
 s_story_line1 dta c'OPERATION COMPLETED SUCCESSFULLY.',0
 s_story_line2 dta c'THE NEXT SHIP ACTION IS READY.',0
+s_relax_line1 dta c'THE SITUATION IS DIFFICULT,',0
+s_relax_line2 dta c'BUT LETS HAVE A MOMENT FOR',0
+s_relax_line3 dta c'LITTLE RELAX NOW.',0
 s_continue dta c'ENTER CONTINUE',0
 s_win_title dta c'ALL MAIN SYSTEMS ONLINE',0
 s_win_line1 dta c'JUMP COURSE TO THE NEAREST',0
 s_win_line2 dta c'SPACEPORT IS READY. YOU WIN!',0
+s_success_line1 dta c'JUMP COURSE LOCKED.',0
+s_success_line2 dta c'THE CREW ESCAPES THE ABYSS.',0
 s_power_fail dta c'POWER SYSTEM FAILURE',0
 s_power_line1 dta c'THE LIGHTS FAIL. AIR STALES.',0
 s_power_line2 dta c'THE CREW FALLS SILENT.',0
@@ -3050,6 +4341,43 @@ s_process_line2 dta c'FIRE CONSUMES THE SHIP.',0
 s_denied   dta c'ACTION LOCKED, COOLING, OR TOO COSTLY',0
 s_won      dta c'ALL MAIN SYSTEMS ONLINE!',0
 s_lost     dta c'A SHIP SYSTEM WAS DESTROYED.',0
-s_restart  dta c'PRESS FIRE TO RESTART',0
+s_game_title dta c'COSMIC ABYSS',0
+s_title_start dta c'PRESS FIRE OR ANY KEY',0
+s_brief_title dta c'SHIP EMERGENCY LOG',0
+s_brief_line1 dta c'AN ASTEROID STRIKE HAS LEFT',0
+s_brief_line2 dta c'YOUR SHIP DRIFTING IN DARKNESS.',0
+s_brief_line3 dta c'KEEP POWER, AIR, AND PROCESSING',0
+s_brief_line4 dta c'ALIVE WHILE YOU REPAIR THE SHIP.',0
+s_brief_line5 dta c'RESTORE MAIN SYSTEMS AND ESCAPE.',0
+s_brief_start dta c'FIRE OR ANY KEY TO BEGIN',0
+
+failure_image_lo dta <failure_power_bitmap,<failure_power_bitmap,<failure_power_bitmap
+failure_image_hi dta >failure_power_bitmap,>failure_power_bitmap,>failure_power_bitmap
+
+failure_power_bitmap
+        ; pic/power.png scaled to 132x99 and packed as 4-bit grayscale.
+        ; It expands 2x at runtime to 264x198, nearly filling 320x200.
+        ins 'atari/gameover-power.4bpp'
+
+success_bitmap
+        ; pic/success.png scaled to 132x99 and packed as four grayscale levels.
+        ; It expands 2x at runtime to a 264x198 victory picture.
+        ins 'atari/success-screen.2bpp'
+
+title_bitmap
+        ; pic/girl1.png scaled into a 160x100 four-level title bitmap.
+        ; It expands 2x at runtime, saving 4 KB for the success artwork.
+        ins 'atari/title-screen.2bpp'
+
+briefing_bitmap
+        ; pic/repair.png cropped to 8:5, scaled to 160x100, and packed 2bpp.
+        ; It expands 2x at runtime to fill the 320x200 VBXE framebuffer.
+        ins 'atari/repair-screen.2bpp'
+
+        org $A000
+shower_bitmap
+        ; pic/shower.png centre-cropped to 4:3, scaled to 132x99, and packed 2bpp.
+        ; RAM under BASIC holds the packed source; it expands into the VBXE screen.
+        ins 'atari/shower-screen.2bpp'
 
         run main
