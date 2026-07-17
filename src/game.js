@@ -16,6 +16,10 @@ const COST_LIF = [0, 0, 0, 0, 0, 1, 0];
 const COST_PRC = [1, 0, 0, 2, 0, 1, 1];
 const NAMES = ["POWER", "LIFE SUPPORT", "PROCESSING", "ENGINEERING", "GUIDANCE", "ENGINES", "SENSORS"];
 const ACTION_KEYS = ["P", "L", "O", "E", "G", "N", "S"];
+const EVENT_TEST_MODE = true;
+const TRADE_PROMPTS = ["OPPORTUNITY", "DO YOU WANT", "HAVE OPTION", "ROBOT OFFER"];
+const SALVAGE_DESCRIPTIONS = ["ALPHA MACHINE", "HELP RESEARCH", "REPAIR DRONE", "RESTORE RELAY"];
+const HAZARD_DESCRIPTIONS = ["COOLANT LEAK", "RESEARCH FIRE", "POWER SURGE", "CORE FAILURE"];
 const ROW_Y = [18, 34, 50, 66, 82, 98, 114];
 const ICONS = [
   [0x18, 0x18, 0x30, 0x7c, 0x18, 0x30, 0x20, 0x00], // power: bolt
@@ -82,6 +86,17 @@ let specialTimer;
 let storyType;
 let failureSystem;
 let deniedUntil;
+let eventType;
+let eventMode;
+let eventNextSec;
+let eventWindow;
+let eventSource;
+let eventDest;
+let eventGain;
+let eventCode;
+let eventEntered;
+let eventResult;
+let eventDescription;
 let lastTime = performance.now();
 
 const failureImage = new Image();
@@ -152,8 +167,150 @@ function gameInit() {
   storyType = null;
   failureSystem = -1;
   deniedUntil = 0;
+  initEvents();
   announce("New game. Power selected.");
   drawScreen();
+}
+
+function randomInt(max) {
+  return Math.floor(Math.random() * max);
+}
+
+function scheduleNextEvent() {
+  eventNextSec = 1 + randomInt(5);
+}
+
+function initEvents() {
+  eventType = null;
+  eventMode = null;
+  eventWindow = 0;
+  eventSource = 0;
+  eventDest = 0;
+  eventGain = 0;
+  eventCode = [];
+  eventEntered = "";
+  eventResult = "";
+  eventDescription = "";
+  scheduleNextEvent();
+  updateEventControls();
+}
+
+function startRandomEvent() {
+  const safeSources = [0, 1, 2].filter(index => health[index] >= 2);
+  if (Math.random() < 0.5 && safeSources.length) {
+    eventType = "decision";
+    eventMode = "trade";
+    eventSource = safeSources[randomInt(safeSources.length)];
+    const destinations = [0, 1, 2].filter(index => index !== eventSource);
+    eventDest = destinations[randomInt(destinations.length)];
+    eventGain = 1 + randomInt(2);
+    eventDescription = TRADE_PROMPTS[randomInt(TRADE_PROMPTS.length)];
+    eventWindow = 10;
+  } else {
+    eventType = "code";
+    eventMode = Math.random() < 2 / 3 ? "salvage" : "hazard";
+    eventDest = randomInt(3);
+    eventGain = 1 + randomInt(2);
+    eventCode = Array.from({ length: 4 }, () => randomInt(10));
+    const descriptions = eventMode === "salvage" ? SALVAGE_DESCRIPTIONS : HAZARD_DESCRIPTIONS;
+    eventDescription = descriptions[randomInt(descriptions.length)];
+    eventEntered = "";
+    eventWindow = 10;
+  }
+  updateEventControls();
+  announce(eventType === "decision" ? "Robot trade offer. Press Y or N." : "Emergency code event. Enter four digits.");
+}
+
+function finishEvent(result, seconds = 3) {
+  eventType = "result";
+  eventResult = result;
+  eventWindow = EVENT_TEST_MODE ? 1 : seconds;
+  eventEntered = "";
+  updateEventControls();
+}
+
+function applyEventResource(index, amount) {
+  health[index] = clamp(health[index] + amount, 0, 10);
+}
+
+function acceptDecisionEvent() {
+  if (eventType !== "decision") return false;
+  applyEventResource(eventSource, -1);
+  applyEventResource(eventDest, eventGain);
+  finishEvent("trade");
+  announce(`Robot trade accepted: 1 ${NAMES[eventSource]} for ${eventGain} ${NAMES[eventDest]}.`);
+  checkEnd();
+  return true;
+}
+
+function rejectDecisionEvent() {
+  if (eventType !== "decision") return false;
+  finishEvent("rejected", 2);
+  announce("Robot trade rejected.");
+  return true;
+}
+
+function completeCodeEvent() {
+  if (eventMode === "salvage") {
+    applyEventResource(eventDest, eventGain);
+    finishEvent("salvage");
+    announce(`Salvage secured: ${eventGain} ${NAMES[eventDest]}.`);
+  } else {
+    finishEvent("prevented");
+    announce(`Hazard prevented. ${NAMES[eventDest]} protected.`);
+  }
+  checkEnd();
+}
+
+function failCodeEvent() {
+  if (eventMode === "hazard") {
+    applyEventResource(eventDest, -eventGain);
+    finishEvent("failed");
+    announce(`Code failed: lost ${eventGain} ${NAMES[eventDest]}.`);
+  } else {
+    finishEvent("missed");
+    announce("Salvage opportunity missed.");
+  }
+  checkEnd();
+}
+
+function enterEventDigit(digit) {
+  if (eventType !== "code") return false;
+  const expected = eventCode[eventEntered.length];
+  if (digit === expected) eventEntered = `${eventEntered}${digit}`;
+  if (eventEntered.length === 4) completeCodeEvent();
+  updateEventControls();
+  return true;
+}
+
+function tickEvents(deltaSeconds) {
+  if (eventType === "decision") {
+    eventWindow -= deltaSeconds;
+    if (eventWindow <= 0) rejectDecisionEvent();
+    return;
+  }
+  if (eventType === "code") {
+    eventWindow -= deltaSeconds;
+    if (eventWindow <= 0) failCodeEvent();
+    return;
+  }
+  if (eventType === "result") {
+    eventWindow -= deltaSeconds;
+    if (eventWindow <= 0) {
+      eventType = null;
+      eventResult = "";
+      scheduleNextEvent();
+      updateEventControls();
+    }
+    return;
+  }
+  eventNextSec -= deltaSeconds;
+  if (eventNextSec <= 0) startRandomEvent();
+}
+
+function updateEventControls() {
+  document.querySelector(".decision-keys")?.toggleAttribute("hidden", eventType !== "decision");
+  document.querySelector(".code-keys")?.toggleAttribute("hidden", eventType !== "code");
 }
 
 function startGame() {
@@ -371,6 +528,8 @@ function tickGame(deltaSeconds) {
     announce(`Load cycle deducted ${loadPwr} power and ${loadLif} life support.`);
     checkEnd();
   }
+
+  if (!gameMode) tickEvents(deltaSeconds);
 }
 
 function checkEnd() {
@@ -448,6 +607,7 @@ function drawScreen() {
   textAt("M", 288, 8, C.hint);
   drawRows();
   drawFooter();
+  drawEventPanel();
   if (gameMode) drawEnd();
   else if (modalType) drawModificationModal();
   else if (storyType !== null) drawStoryModal();
@@ -530,6 +690,51 @@ function drawFooter() {
   }
 }
 
+function drawEventPanel() {
+  fillRect(12, 131, 296, 17, C.win);
+  if (!eventType) return;
+
+  fillRoundRect(12, 131, 296, 16, 3, C.border);
+  fillRoundRect(14, 133, 292, 12, 2, C.win);
+
+  if (eventType === "decision") {
+    textAt(eventDescription, 20, 134, C.title);
+    drawPriceTerm(-1, eventSource, 124, 134);
+    drawPriceTerm(eventGain, eventDest, 148, 134);
+    textAt("Y/N", 268, 134, C.value);
+    fillRect(20, 143, 276, 2, C.selected);
+    fillRect(20, 143, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
+    return;
+  }
+
+  if (eventType === "code") {
+    textAt(eventDescription, 20, 134, C.title);
+    const remainingCode = eventCode.map((digit, index) => index < eventEntered.length ? " " : digit).join("");
+    textAt(remainingCode, 128, 134, C.value);
+    drawPriceTerm(eventMode === "salvage" ? eventGain : -eventGain, eventDest, 168, 134);
+    fillRect(20, 143, 276, 2, C.selected);
+    fillRect(20, 143, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
+    return;
+  }
+
+  const resultText = {
+    trade: "ROBOT TRADE DONE",
+    rejected: "ROBOT OFFER REJECTED",
+    salvage: "SALVAGE SECURED",
+    prevented: "HAZARD PREVENTED",
+    failed: "CODE FAILED",
+    missed: "SALVAGE MISSED"
+  }[eventResult];
+  const color = eventResult === "failed" ? C.offline :
+    ["trade", "salvage"].includes(eventResult) ? C.online : C.text;
+  textAt(resultText, 20, 134, color);
+  if (eventResult === "trade") {
+    drawPriceTerm(eventGain, eventDest, 180, 134);
+  } else if (["salvage", "prevented", "failed", "missed"].includes(eventResult)) {
+    drawPriceTerm(eventMode === "salvage" ? eventGain : -eventGain, eventDest, 180, 134);
+  }
+}
+
 function drawEnd() {
   if (gameMode === 2) {
     drawFailureImage();
@@ -577,7 +782,7 @@ function drawBriefing() {
     remaining -= line.length;
   });
   if (briefingChars >= BRIEFING_LENGTH) {
-    briefingTextAt("FIRE OR ENTER TO BEGIN", 160, 176, "#f2fff5");
+    briefingTextAt("PRESS SPACE TO BEGIN", 160, 176, "#f2fff5");
   }
 }
 
@@ -602,7 +807,7 @@ function drawStoryModal() {
   textAt(lines[0], 48, 68, C.title);
   textAt(lines[1], 48, 86, C.text);
   textAt(lines[2], 48, 98, C.text);
-  textAt("ENTER CONTINUE", 168, 126, C.hint);
+  textAt("PRESS SPACE TO CONTINUE", 160, 126, C.hint, "center");
 }
 
 function drawModificationModal() {
@@ -627,7 +832,7 @@ function drawModificationModal() {
     if (modalType === "amount") drawAmountModificationDetail(index, y + 10, installed ? C.hint : C.text);
     else textAt(getModificationDetail(modalType, index), 70, y + 10, installed ? C.hint : C.text);
   });
-  textAt("ESC CANCEL", 204, 150, C.hint);
+  textAt("SPACE CLOSE", 204, 150, C.hint);
 }
 
 function drawAmountModificationDetail(index, y, arrowColor) {
@@ -698,12 +903,22 @@ document.addEventListener("keydown", event => {
     return;
   }
   if (modalType) {
-    if (key === "escape") closeModification();
+    if (key === "escape" || key === " ") closeModification();
     else {
       const option = ["p", "l", "o"].indexOf(key);
       if (option >= 0) selectModification(option);
     }
     event.preventDefault();
+    return;
+  }
+  if (eventType === "decision" && (key === "y" || key === "n")) {
+    event.preventDefault();
+    if (!event.repeat) (key === "y" ? acceptDecisionEvent : rejectDecisionEvent)();
+    return;
+  }
+  if (eventType === "code" && /^[0-9]$/.test(key)) {
+    event.preventDefault();
+    if (!event.repeat) enterEventDigit(Number(key));
     return;
   }
   const actionIndex = ["p", "l", "o", "e", "g", "n", "s"].indexOf(key);
@@ -740,6 +955,20 @@ document.querySelectorAll("[data-control]").forEach(button => {
       return;
     }
     handleControl(button.dataset.control);
+    canvas.focus({ preventScroll: true });
+  });
+});
+
+document.querySelectorAll("[data-event-decision]").forEach(button => {
+  button.addEventListener("click", () => {
+    (button.dataset.eventDecision === "yes" ? acceptDecisionEvent : rejectDecisionEvent)();
+    canvas.focus({ preventScroll: true });
+  });
+});
+
+document.querySelectorAll("[data-event-digit]").forEach(button => {
+  button.addEventListener("click", () => {
+    enterEventDigit(Number(button.dataset.eventDigit));
     canvas.focus({ preventScroll: true });
   });
 });

@@ -252,11 +252,18 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         jsr read_input
         jmp loop
 ?restart
+        lda CH
+        and #$3F
+        cmp #$21                ; Space
+        beq ?restart_now
         lda STRIG0
         cmp old_fire
         beq ?store
         cmp #0
         bne ?store
+?restart_now
+        lda #$FF
+        sta CH
         jsr game_init
         jsr draw_screen
 ?store  lda STRIG0
@@ -405,6 +412,8 @@ initial_health dta 2,7,9,2,2,1,3
         lda #$FF
         sta CH
         lda ?key
+        cmp #$21                ; Space closes the modification window
+        beq ?cancel
         cmp #$1C                ; Escape
         beq ?cancel
         cmp #$0A                ; P - Power
@@ -443,12 +452,16 @@ initial_health dta 2,7,9,2,2,1,3
         cmp #$FF
         beq ?done
         and #$3F
+        cmp #$21                ; Space
+        beq ?close
         cmp #$1C                ; Escape
         beq ?close
         cmp #$0C                ; Return
         bne ?done
 ?close  lda #$FF
         sta CH
+        lda STRIG0
+        sta old_fire            ; consume FIRE so it cannot activate the game below
         lda #0
         sta story_type
         jmp draw_screen
@@ -2174,80 +2187,6 @@ brief_palette dta 34,39,44,47
         rts
 .endp
 
-.proc draw_relax_modal
-        lda #24
-        sta calc_x
-        lda #0
-        sta calc_x+1
-        sta calc_y
-        lda #272&255
-        sta fr_w
-        lda #272/256
-        sta fr_w+1
-        lda #200
-        sta fr_h
-        lda #C_BORDER
-        sta fr_col
-        jsr fill_round_rect
-
-        lda #<shower_bitmap
-        sta srcp
-        lda #>shower_bitmap
-        sta srcp+1
-        jsr draw_success_bitmap
-
-        lda #32
-        sta calc_x
-        lda #0
-        sta calc_x+1
-        lda #132
-        sta calc_y
-        lda #256&255
-        sta fr_w
-        lda #256/256
-        sta fr_w+1
-        lda #64
-        sta fr_h
-        lda #C_WIN
-        sta fr_col
-        jsr fill_round_rect
-
-        lda #40
-        sta text_x
-        lda #0
-        sta text_x+1
-        lda #139
-        sta text_y
-        lda #<s_relax_line1
-        ldx #>s_relax_line1
-        ldy #49
-        jsr text_at
-        lda #40
-        sta text_x
-        lda #153
-        sta text_y
-        lda #<s_relax_line2
-        ldx #>s_relax_line2
-        ldy #48
-        jsr text_at
-        lda #40
-        sta text_x
-        lda #165
-        sta text_y
-        lda #<s_relax_line3
-        ldx #>s_relax_line3
-        ldy #48
-        jsr text_at
-        lda #168
-        sta text_x
-        lda #182
-        sta text_y
-        lda #<s_continue
-        ldx #>s_continue
-        ldy #C_HINT
-        jmp text_at
-.endp
-
 .proc expand_success_row
         lda #33                 ; 132 two-bit pixels, four packed per byte
         sta title_cols
@@ -2340,33 +2279,6 @@ brief_palette dta 34,39,44,47
         lda #0
         sta VBXE_BANK_SEL
 
-        ; Dark rounded labels keep the game title and prompt readable over art.
-        lda #100
-        sta calc_x
-        lda #0
-        sta calc_x+1
-        lda #5
-        sta calc_y
-        lda #120
-        sta fr_w
-        lda #0
-        sta fr_w+1
-        lda #14
-        sta fr_h
-        lda #C_WIN
-        sta fr_col
-        jsr fill_round_rect
-        lda #108
-        sta text_x
-        lda #0
-        sta text_x+1
-        lda #8
-        sta text_y
-        lda #<s_game_title
-        ldx #>s_game_title
-        ldy #C_TITLE
-        jsr text_at
-
         lda #68
         sta calc_x
         lda #0
@@ -2382,7 +2294,7 @@ brief_palette dta 34,39,44,47
         lda #C_WIN
         sta fr_col
         jsr fill_round_rect
-        lda #76
+        lda #80
         sta text_x
         lda #0
         sta text_x+1
@@ -2628,7 +2540,7 @@ brief_text_col dta 48
         sta txt_ptr+1
         jsr type_brief_line
 
-        lda #64
+        lda #80
         sta text_x
         lda #0
         sta text_x+1
@@ -2654,8 +2566,9 @@ brief_text_col dta 48
         lda STRIG0
         beq ?start
         lda CH
-        cmp #$FF
-        beq ?wait
+        and #$3F
+        cmp #$21                ; Space
+        bne ?wait
 ?start  lda #$FF
         sta CH
         rts
@@ -3015,7 +2928,7 @@ status_col dta 0
         rts
 .endp
 
-price_x dta 0
+price_x dta a(0)
 price_y dta 0
 price_idx dta 0
 term_amount dta 0
@@ -3027,7 +2940,7 @@ term_sign dta 0
         sty term_sign
         lda price_x
         sta text_x
-        lda #0
+        lda price_x+1
         sta text_x+1
         lda price_y
         sta text_y
@@ -3046,6 +2959,9 @@ term_sign dta 0
         clc
         adc #16
         sta icon_draw_x
+        lda price_x+1
+        adc #0
+        sta icon_draw_x+1
         lda price_y
         sta icon_draw_y
         ldx term_icon
@@ -3054,13 +2970,18 @@ term_sign dta 0
         clc
         adc #24
         sta price_x
+        bcc ?advanced
+        inc price_x+1
+?advanced
         rts
 .endp
 
 .proc draw_action_price        ; X=action/system index
         stx price_idx
-        lda #116
+        lda #140
         sta price_x
+        lda #0
+        sta price_x+1
         lda row_y_tab,x
         clc
         adc #3
@@ -3094,6 +3015,8 @@ term_sign dta 0
         stx price_idx
         lda #216
         sta price_x
+        lda #0
+        sta price_x+1
         lda row_y_tab,x
         clc
         adc #3
@@ -3231,6 +3154,8 @@ resource_key_glyph dta 48,44,47             ; P,L,O
 ?icon
         lda #20
         sta icon_draw_x
+        lda #0
+        sta icon_draw_x+1
         ldx ?idx
         lda row_y_tab,x
         clc
@@ -3311,6 +3236,8 @@ legend_icon dta 0
         sty legend_icon
         lda legend_x
         sta icon_draw_x
+        lda #0
+        sta icon_draw_x+1
         lda legend_y
         sta icon_draw_y
         ldx legend_icon
@@ -3978,7 +3905,7 @@ crt_noise_points
         ldx #>s_story_line2
         ldy #C_TEXT
         jsr text_at
-        lda #168
+        lda #68
         sta text_x
         lda #126
         sta text_y
@@ -4146,6 +4073,8 @@ modal_mask dta 0
         jsr draw_char
 ?icon   lda #56
         sta icon_draw_x
+        lda #0
+        sta icon_draw_x+1
         lda modal_y
         sta icon_draw_y
         ldx modal_idx
@@ -4320,7 +4249,7 @@ s_speed_desc dta c'HALVES ONE RESOURCE COOLDOWN',0
 s_auto_detail dta c'MANUAL > AUTO EVERY COOLDOWN',0
 s_speed_detail dta c'10 SEC COOLDOWN > 5 SEC',0
 s_installed dta c'INSTALLED',0
-s_cancel   dta c'ESC CANCEL',0
+s_cancel   dta c'SPACE CLOSE',0
 s_scan_title dta c'SECTOR SCAN COMPLETE',0
 s_plot_title dta c'COURSE PLOTTED',0
 s_jump_title dta c'JUMPDRIVE ACTIVATED',0
@@ -4330,7 +4259,7 @@ s_story_line2 dta c'THE NEXT SHIP ACTION IS READY.',0
 s_relax_line1 dta c'THE SITUATION IS DIFFICULT,',0
 s_relax_line2 dta c'BUT LETS HAVE A MOMENT FOR',0
 s_relax_line3 dta c'LITTLE RELAX NOW.',0
-s_continue dta c'ENTER CONTINUE',0
+s_continue dta c'PRESS SPACE TO CONTINUE',0
 s_win_title dta c'ALL MAIN SYSTEMS ONLINE',0
 s_win_line1 dta c'JUMP COURSE TO THE NEAREST',0
 s_win_line2 dta c'SPACEPORT IS READY. YOU WIN!',0
@@ -4348,15 +4277,14 @@ s_process_line2 dta c'FIRE CONSUMES THE SHIP.',0
 s_denied   dta c'ACTION LOCKED, COOLING, OR TOO COSTLY',0
 s_won      dta c'ALL MAIN SYSTEMS ONLINE!',0
 s_lost     dta c'A SHIP SYSTEM WAS DESTROYED.',0
-s_game_title dta c'COSMIC ABYSS',0
-s_title_start dta c'PRESS FIRE OR ANY KEY',0
+s_title_start dta c'PRESS SPACE TO START',0
 s_brief_title dta c'SHIP EMERGENCY LOG',0
 s_brief_line1 dta c'AN ASTEROID STRIKE HAS LEFT',0
 s_brief_line2 dta c'YOUR SHIP DRIFTING IN DARKNESS.',0
 s_brief_line3 dta c'KEEP POWER, AIR, AND PROCESSING',0
 s_brief_line4 dta c'ALIVE WHILE YOU REPAIR THE SHIP.',0
 s_brief_line5 dta c'RESTORE MAIN SYSTEMS AND ESCAPE.',0
-s_brief_start dta c'FIRE OR ANY KEY TO BEGIN',0
+s_brief_start dta c'PRESS SPACE TO BEGIN',0
 
 failure_image_lo dta <failure_power_bitmap,<failure_power_bitmap,<failure_power_bitmap
 failure_image_hi dta >failure_power_bitmap,>failure_power_bitmap,>failure_power_bitmap
@@ -4383,11 +4311,11 @@ briefing_bitmap
 
         org $A000
 shower_bitmap
-        ; pic/shower.png centre-cropped to 4:3, scaled to 132x99, and packed 2bpp.
-        ; RAM under BASIC holds the packed source; it expands into the VBXE screen.
+        ; pic/shower.png centre-cropped to 8:5, scaled to 160x100, and packed 2bpp.
+        ; It expands 2x to fill the complete 320x200 VBXE framebuffer.
         ins 'atari/shower-screen.2bpp'
 
-        org $AD00
+        org $B000
 
 ;=============================================================================
 ; Random event strip
@@ -4402,6 +4330,8 @@ event_window    dta 0
 event_source    dta 0
 event_dest      dta 0
 event_gain      dta 0
+event_desc      dta 0
+event_trade_desc dta 0
 event_rng       dta 1
 event_entered   dta 0
 event_code      dta 0,0,0,0
@@ -4440,13 +4370,13 @@ event_tries     dta 0
 
 .proc schedule_next_event
         jsr event_random
-?mod   cmp #31
+?mod   cmp #5
         bcc ?ready
         sec
-        sbc #31
+        sbc #5
         bcs ?mod
 ?ready clc
-        adc #30                 ; another event in 30..60 seconds
+        adc #1                  ; blank pause of 1..5 seconds between events
         sta event_next_sec
         rts
 .endp
@@ -4504,6 +4434,11 @@ event_tries     dta 0
         clc
         adc #1
         sta event_gain          ; trade one point for one or two elsewhere
+        jsr event_random
+        and #3
+        sta event_trade_desc
+        lda #10
+        sta event_window        ; same ten-second window as code challenges
         lda #2
         sta event_mode
         lda #1
@@ -4512,14 +4447,22 @@ event_tries     dta 0
 
 ?code   jsr event_random3
         sta event_dest
-        jsr event_random
-        and #1
+        jsr event_random3       ; two salvage events for every one hazard
+        beq ?hazard_mode
+        lda #0
+        beq ?store_mode
+?hazard_mode
+        lda #1
+?store_mode
         sta event_mode          ; salvage reward or incoming hazard
         jsr event_random
         and #1
         clc
         adc #1
         sta event_gain
+        jsr event_random
+        and #3
+        sta event_desc
         lda #0
         sta event_entered
         ldx #0
@@ -4541,7 +4484,17 @@ event_tries     dta 0
         lda event_type
         beq ?waiting
         cmp #1
-        beq ?done               ; decision events wait for Y or N
+        bne ?check_code
+        dec event_window
+        bne ?trade_running
+        lda #4                  ; unanswered trade is rejected
+        sta event_type
+        lda #1
+        sta event_window
+        jmp draw_event_panel
+?trade_running
+        jmp draw_event_panel
+?check_code
         cmp #2
         bne ?result
         dec event_window
@@ -4558,7 +4511,9 @@ event_tries     dta 0
 ?draw   jmp draw_event_panel
 ?waiting
         dec event_next_sec
-        bne ?done
+        beq ?start
+        jmp draw_event_panel
+?start
         jmp start_random_event
 ?done   rts
 .endp
@@ -4610,7 +4565,7 @@ digit_scan_codes
         sta CH
         lda #4
         sta event_type
-        lda #2
+        lda #1                  ; rapid test mode: one-second result flash
         sta event_window
         jsr draw_event_panel
         sec
@@ -4636,9 +4591,7 @@ digit_scan_codes
         jsr draw_event_panel
         sec
         rts
-?wrong  lda #0
-        sta event_entered       ; a wrong digit restarts the four-digit entry
-        jsr draw_event_panel
+?wrong  jsr draw_event_panel     ; wrong digits are ignored and never displayed
         sec
         rts
 ?complete
@@ -4686,7 +4639,7 @@ digit_scan_codes
         jsr add_event_resource
         lda #3
         sta event_type
-        lda #3
+        lda #1                  ; rapid test mode: one-second result flash
         sta event_window
         jmp redraw_after_event
 .endp
@@ -4702,7 +4655,7 @@ digit_scan_codes
 ?prevented
         lda #3
         sta event_type
-        lda #3
+        lda #1                  ; rapid test mode: one-second result flash
         sta event_window
         jmp redraw_after_event
 .endp
@@ -4717,7 +4670,7 @@ digit_scan_codes
         jsr subtract_event_resource
 ?missed lda #5
         sta event_type
-        lda #3
+        lda #1                  ; rapid test mode: one-second result flash
         sta event_window
         jmp redraw_after_event
 .endp
@@ -4727,9 +4680,14 @@ digit_scan_codes
         sta text_col
         ldx #0
 ?digit  stx event_draw_idx
+        cpx event_entered
+        bcc ?hidden
         lda event_code,x
         clc
         adc #16
+        bne ?draw
+?hidden lda #0                  ; correct leading digits disappear
+?draw
         jsr draw_char
         ldx event_draw_idx
         inx
@@ -4738,25 +4696,64 @@ digit_scan_codes
         rts
 .endp
 
-.proc draw_entered_digits
-        lda #C_TEXT
-        sta text_col
-        ldx #0
-?digit  stx event_draw_idx
-        cpx event_entered
-        bcs ?blank
-        lda event_code,x
-        clc
-        adc #16
-        bne ?draw
-?blank  lda #63                 ; underscore
-?draw   jsr draw_char
-        ldx event_draw_idx
-        inx
-        cpx #4
-        bne ?digit
-        rts
+event_width_lo dta <0,<27,<55,<82,<110,<138,<165,<193,<220,<248,<276
+event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
+
+.proc draw_event_progress
+        lda #20
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #143
+        sta calc_y
+        lda #<276
+        sta fr_w
+        lda #>276
+        sta fr_w+1
+        lda #2
+        sta fr_h
+        lda #C_SELECT
+        sta fr_col
+        jsr fill_rect
+        ldx event_window
+        lda event_width_lo,x
+        sta fr_w
+        lda event_width_hi,x
+        sta fr_w+1
+        ora fr_w
+        beq ?done
+        lda #C_COOLDOWN
+        sta fr_col
+        jsr fill_rect
+?done   rts
 .endp
+
+.proc draw_event_effect
+        lda #168
+        sta price_x
+        lda #0
+        sta price_x+1
+        lda #134
+        sta price_y
+        lda event_mode
+        cmp #1
+        beq ?loss
+        lda event_gain
+        ldx event_dest
+        ldy #11                 ; '+' followed by the resource icon
+        jmp draw_price_term
+?loss   lda event_gain
+        ldx event_dest
+        ldy #13                 ; '-' followed by the resource icon
+        jmp draw_price_term
+.endp
+
+salvage_desc_lo dta <s_event_alpha,<s_event_research,<s_event_drone,<s_event_relay
+salvage_desc_hi dta >s_event_alpha,>s_event_research,>s_event_drone,>s_event_relay
+hazard_desc_lo dta <s_event_leak,<s_event_fire,<s_event_surge,<s_event_core
+hazard_desc_hi dta >s_event_leak,>s_event_fire,>s_event_surge,>s_event_core
+trade_desc_lo dta <s_trade_opportunity,<s_trade_want,<s_trade_option,<s_trade_offer
+trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_offer
 
 .proc draw_event_panel
         lda #12
@@ -4818,15 +4815,20 @@ digit_scan_codes
         sta text_x
         lda #0
         sta text_x+1
-        lda #135
+        lda #134
         sta text_y
-        lda #<s_event_robot
-        ldx #>s_event_robot
+        ldx event_trade_desc
+        lda trade_desc_lo,x
+        sta txt_ptr
+        lda trade_desc_hi,x
+        sta txt_ptr+1
+        lda txt_ptr
+        ldx txt_ptr+1
         ldy #C_TITLE
         jsr text_at
-        lda #116
+        lda #124
         sta price_x
-        lda #135
+        lda #134
         sta price_y
         lda #1
         ldx event_source
@@ -4840,62 +4842,49 @@ digit_scan_codes
         sta text_x
         lda #0
         sta text_x+1
-        lda #135
+        lda #134
         sta text_y
         lda #<s_event_yes_no
         ldx #>s_event_yes_no
         ldy #C_VALUE
-        jmp text_at
+        jsr text_at
+        jmp draw_event_progress
 
 ?code   lda #20
         sta text_x
         lda #0
         sta text_x+1
-        lda #135
+        lda #134
         sta text_y
+        ldx event_desc
         lda event_mode
         bne ?hazard
-        lda #<s_event_salvage
-        ldx #>s_event_salvage
+        lda salvage_desc_lo,x
+        sta txt_ptr
+        lda salvage_desc_hi,x
+        sta txt_ptr+1
         bne ?code_title
-?hazard lda #<s_event_hazard
-        ldx #>s_event_hazard
+?hazard lda hazard_desc_lo,x
+        sta txt_ptr
+        lda hazard_desc_hi,x
+        sta txt_ptr+1
 ?code_title
+        lda txt_ptr
+        ldx txt_ptr+1
         ldy #C_TITLE
         jsr text_at
-        lda #84
+        lda #128
         sta text_x
         jsr draw_event_digits
-        lda #124
-        sta text_x
-        lda #<s_event_arrow
-        ldx #>s_event_arrow
-        ldy #C_HINT
-        jsr text_at
-        lda #140
-        sta text_x
-        jsr draw_entered_digits
-        lda #220
-        sta text_x
-        lda event_window
-        sta text_col
-        lda #C_DEGRADE
-        sta text_col
-        lda event_window
-        jsr draw_2digit
-        lda #244
-        sta text_x
-        lda #<s_event_seconds
-        ldx #>s_event_seconds
-        ldy #C_HINT
-        jmp text_at
+        jsr draw_event_effect
+        jmp draw_event_progress
 
 ?result
         lda #20
         sta text_x
         lda #0
         sta text_x+1
-        lda #135
+        lda #134
         sta text_y
         lda event_type
         cmp #4
@@ -4913,7 +4902,7 @@ digit_scan_codes
 ?prevented
         lda #<s_event_prevented
         ldx #>s_event_prevented
-        bne ?plain_result
+        bne ?plain_effect
 ?trade_done
         lda #<s_event_trade_done
         ldx #>s_event_trade_done
@@ -4931,45 +4920,214 @@ digit_scan_codes
 ?salvage_missed
         lda #<s_event_missed
         ldx #>s_event_missed
-        bne ?plain_result
+        bne ?plain_effect
 ?failed_text
         ldy #C_OFFLINE
         jsr text_at
-        lda #180
-        sta price_x
-        lda #135
-        sta price_y
-        lda event_gain
-        ldx event_dest
-        ldy #13
-        jmp draw_price_term
+        jmp draw_event_effect
 ?result_text
         ldy #C_ONLINE
         jsr text_at
-        lda #180
-        sta price_x
-        lda #135
-        sta price_y
-        lda event_gain
-        ldx event_dest
-        ldy #11
-        jmp draw_price_term
+        jmp draw_event_effect
+?plain_effect
+        ldy #C_TEXT
+        jsr text_at
+        jmp draw_event_effect
 ?plain_result
         ldy #C_TEXT
         jmp text_at
 .endp
 
-s_event_robot     dta c'ROBOT TRADE',0
+s_trade_opportunity dta c'OPPORTUNITY',0
+s_trade_want      dta c'DO YOU WANT',0
+s_trade_option    dta c'HAVE OPTION',0
+s_trade_offer     dta c'ROBOT OFFER',0
 s_event_yes_no    dta c'Y/N',0
-s_event_salvage   dta c'SALVAGE',0
-s_event_hazard    dta c'HAZARD',0
-s_event_arrow     dta c'>',0
-s_event_seconds   dta c'SEC',0
+s_event_alpha     dta c'ALPHA MACHINE',0
+s_event_research  dta c'HELP RESEARCH',0
+s_event_drone     dta c'REPAIR DRONE',0
+s_event_relay     dta c'RESTORE RELAY',0
+s_event_leak      dta c'COOLANT LEAK',0
+s_event_fire      dta c'RESEARCH FIRE',0
+s_event_surge     dta c'POWER SURGE',0
+s_event_core      dta c'CORE FAILURE',0
 s_event_success   dta c'SALVAGE SECURED',0
 s_event_prevented dta c'HAZARD PREVENTED',0
-s_event_trade_done dta c'ROBOT TRADE COMPLETE',0
+s_event_trade_done dta c'ROBOT TRADE DONE',0
 s_event_rejected  dta c'ROBOT OFFER REJECTED',0
 s_event_failed    dta c'CODE FAILED',0
 s_event_missed    dta c'SALVAGE MISSED',0
+
+.proc draw_relax_bitmap
+        jsr wait_blit
+        lda #0
+        sta title_bank
+        lda #BANK_EN
+        sta VBXE_BANK_SEL
+        lda #<shower_bitmap
+        sta srcp
+        lda #>shower_bitmap
+        sta srcp+1
+        lda #<MEMW
+        sta dstp
+        lda #>MEMW
+        sta dstp+1
+        lda #100
+        sta title_rows
+?row   lda srcp
+        sta title_row_src
+        lda srcp+1
+        sta title_row_src+1
+        jsr expand_briefing_row
+        lda srcp
+        sta title_next_src
+        lda srcp+1
+        sta title_next_src+1
+        lda title_row_src
+        sta srcp
+        lda title_row_src+1
+        sta srcp+1
+        jsr expand_briefing_row
+        lda title_next_src
+        sta srcp
+        lda title_next_src+1
+        sta srcp+1
+        dec title_rows
+        bne ?row
+        lda #0
+        sta VBXE_BANK_SEL
+        rts
+.endp
+
+.proc draw_relax_modal
+        jsr draw_relax_bitmap
+        lda #0
+        sta relax_type_skip
+        lda #52
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #148
+        sta text_y
+        lda #<s_relax_line1
+        sta txt_ptr
+        lda #>s_relax_line1
+        sta txt_ptr+1
+        lda #49
+        sta brief_text_col
+        jsr type_relax_line
+        lda relax_type_skip
+        bne ?skip
+        lda #56
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #162
+        sta text_y
+        lda #<s_relax_line2
+        sta txt_ptr
+        lda #>s_relax_line2
+        sta txt_ptr+1
+        lda #48
+        sta brief_text_col
+        jsr type_relax_line
+        lda relax_type_skip
+        bne ?skip
+        lda #92
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #176
+        sta text_y
+        lda #<s_relax_line3
+        sta txt_ptr
+        lda #>s_relax_line3
+        sta txt_ptr+1
+        jsr type_relax_line
+        lda relax_type_skip
+        bne ?skip
+        lda #68
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #188
+        sta text_y
+        lda #<s_relax_continue
+        sta txt_ptr
+        lda #>s_relax_continue
+        sta txt_ptr+1
+        lda #49
+        sta brief_text_col
+        jmp draw_brief_text
+?skip   lda STRIG0
+        sta old_fire            ; consume the FIRE press used to skip typing
+        lda #$FF
+        sta CH                  ; consume the Space press used to skip typing
+        lda #0
+        sta story_type
+        jmp draw_screen
+.endp
+
+; The relaxation popup uses the briefing's outlined glyph renderer, but its
+; per-character delay watches both Space and FIRE. A held joystick button must
+; first be released, preventing the action that opened the screen from
+; dismissing it immediately.
+relax_type_skip dta 0
+
+.proc relax_char_delay
+        ldx #3
+?frame jsr wait_frame
+        lda CH
+        and #$3F
+        cmp #$21                ; Space skips typing and closes the popup
+        bne ?fire
+        lda #$FF
+        sta CH
+        lda #1
+        sta relax_type_skip
+        rts
+?fire
+        lda relax_release
+        bne ?armed
+        lda STRIG0
+        beq ?next
+        lda #1
+        sta relax_release
+        bne ?next
+?armed  lda STRIG0
+        bne ?next
+        lda #1
+        sta relax_type_skip
+        rts
+?next   dex
+        bne ?frame
+        rts
+.endp
+
+.proc type_relax_line
+        lda txt_ptr
+        sta brief_ptr
+        lda txt_ptr+1
+        sta brief_ptr+1
+?char  lda brief_ptr
+        sta txt_ptr
+        lda brief_ptr+1
+        sta txt_ptr+1
+        ldy #0
+        lda (txt_ptr),y
+        beq ?done
+        sec
+        sbc #32
+        jsr draw_brief_glyph
+        inc brief_ptr
+        bne ?wait
+        inc brief_ptr+1
+?wait   jsr relax_char_delay
+        lda relax_type_skip
+        beq ?char
+?done   rts
+.endp
+
+s_relax_continue dta c'PRESS SPACE TO CONTINUE',0
 
         run main

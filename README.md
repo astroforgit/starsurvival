@@ -42,12 +42,14 @@ npm run build       # production build in dist/
 npm run preview     # serve the production build locally
 ```
 
-Keyboard controls use the arrow keys and Space or Enter for FIRE. Matching
+Keyboard controls use the arrow keys and Space or Enter for the selected action. Matching
 on-screen controls are available for touch devices.
 
 Direct action keys are `P` Power, `L` Life Support, `O` Processing, `E`
 Engineering, `G` Guidance, `N` Engines, and `S` Sensors. Modifications use `A`
-Amount, `U` Auto, and `D` Speed.
+Amount, `U` Auto, and `D` Speed. Random events reserve `Y/N` for decisions and
+the number keys for four-digit challenges; matching touch buttons appear while
+an event is active.
 
 ## Atari build
 
@@ -63,14 +65,14 @@ The command assembles `atari/ravaged-space.asm` into
 Atari controls:
 
 - joystick up/down selects a system
-- FIRE performs the selected system action
+- Space performs the selected system action
 - joystick left purchases the Amount modification
 - joystick right purchases the speed modification
 - keyboard `P/L/O/E/G/N/S` performs the corresponding action directly
 - keyboard `A/U/D` purchases Amount, Auto, or Speed directly
 - keyboard `Y/N` accepts or rejects a random robot trade
 - number keys enter the displayed four-digit emergency code
-- FIRE after game over starts a new game
+- Space after game over starts a new game
 
 ## Game rules
 
