@@ -68,6 +68,8 @@ Atari controls:
 - joystick right purchases the speed modification
 - keyboard `P/L/O/E/G/N/S` performs the corresponding action directly
 - keyboard `A/U/D` purchases Amount, Auto, or Speed directly
+- keyboard `Y/N` accepts or rejects a random robot trade
+- number keys enter the displayed four-digit emergency code
 - FIRE after game over starts a new game
 
 ## Game rules
@@ -95,6 +97,11 @@ the source changes Generate Power to `+10` Power with no Processing cost.
 
 Victory has its own spaceport-jump popup. Power, Life Support, and Processing
 failures each use a separate loss scenario and message.
+
+Random events appear in the narrow panel below the system table. Robot events
+offer a one-point resource exchange for one or two points of another resource.
+Timed salvage and hazard events show a random four-digit code; entering it
+within ten seconds collects the salvage or prevents the displayed resource loss.
 
 ## VBXE implementation
 

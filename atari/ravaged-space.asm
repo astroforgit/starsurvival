@@ -301,6 +301,7 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         sta relax_done
         sta relax_release
         sta old_stick
+        jsr init_events
         lda #$FF
         sta failure_system
         lda #4
@@ -336,6 +337,8 @@ initial_health dta 2,7,9,2,2,1,3
 ; Direct action keys: P/L/O/E/G/N/S. Modification keys: A/U/D.
 ; Values are Atari OS CH scan codes (unshifted letters).
 .proc read_keyboard
+        jsr read_event_keyboard
+        bcs ?done
         lda CH
         cmp #$FF
         beq ?done
@@ -871,6 +874,9 @@ mod_check_mask dta 0
         sta frame50
         jsr tick_relaxation
         lda story_type
+        bne ?r
+        jsr tick_events
+        lda game_mode
         bne ?r
         dec load_sec
 ?load   lda load_sec
@@ -3571,7 +3577,8 @@ tiny_colour dta C_TEXT
         lda #<s_sensors
         ldx #>s_sensors
         ldy #6
-        jmp draw_tiny_legend_item
+        jsr draw_tiny_legend_item
+        jmp draw_event_panel
 .endp
 
 ; A fixed, sparse phosphor pattern keeps the interface legible while breaking up
@@ -4379,5 +4386,590 @@ shower_bitmap
         ; pic/shower.png centre-cropped to 4:3, scaled to 132x99, and packed 2bpp.
         ; RAM under BASIC holds the packed source; it expands into the VBXE screen.
         ins 'atari/shower-screen.2bpp'
+
+        org $AD00
+
+;=============================================================================
+; Random event strip
+;   type 0 = idle, 1 = robot decision, 2 = four-digit challenge
+;        3 = success, 4 = rejected, 5 = failed/missed
+;   mode 0 = salvage reward, 1 = hazard, 2 = robot trade
+;=============================================================================
+event_type      dta 0
+event_mode      dta 0
+event_next_sec  dta 0
+event_window    dta 0
+event_source    dta 0
+event_dest      dta 0
+event_gain      dta 0
+event_rng       dta 1
+event_entered   dta 0
+event_code      dta 0,0,0,0
+event_draw_idx  dta 0
+event_scan      dta 0
+event_tries     dta 0
+
+.proc event_random
+        lda event_rng
+        lsr
+        bcc ?store
+        eor #$B8
+?store sta event_rng
+        rts
+.endp
+
+.proc event_random3
+        jsr event_random
+?mod   cmp #3
+        bcc ?done
+        sec
+        sbc #3
+        bcs ?mod
+?done  rts
+.endp
+
+.proc event_random10
+        jsr event_random
+?mod   cmp #10
+        bcc ?done
+        sec
+        sbc #10
+        bcs ?mod
+?done  rts
+.endp
+
+.proc schedule_next_event
+        jsr event_random
+?mod   cmp #31
+        bcc ?ready
+        sec
+        sbc #31
+        bcs ?mod
+?ready clc
+        adc #30                 ; another event in 30..60 seconds
+        sta event_next_sec
+        rts
+.endp
+
+.proc init_events
+        lda RTCLOK+2
+        eor RTCLOK+1
+        eor VCOUNT
+        bne ?seed
+        lda #$A7
+?seed   sta event_rng
+        lda #0
+        sta event_type
+        sta event_mode
+        sta event_window
+        sta event_entered
+        jsr schedule_next_event
+        rts
+.endp
+
+.proc start_random_event
+        jsr event_random
+        and #1
+        bne ?code
+
+        ; Find a resource with at least two points, so accepting a trade can
+        ; never destroy Power, Life Support, or Processing immediately.
+        jsr event_random3
+        sta event_source
+        lda #3
+        sta event_tries
+?source
+        ldx event_source
+        lda health,x
+        cmp #2
+        bcs ?source_ready
+        inc event_source
+        lda event_source
+        cmp #3
+        bcc ?source_next
+        lda #0
+        sta event_source
+?source_next
+        dec event_tries
+        bne ?source
+        jmp ?code               ; no safe trade is possible; use a code event
+
+?source_ready
+?dest   jsr event_random3
+        cmp event_source
+        beq ?dest
+        sta event_dest
+        jsr event_random
+        and #1
+        clc
+        adc #1
+        sta event_gain          ; trade one point for one or two elsewhere
+        lda #2
+        sta event_mode
+        lda #1
+        sta event_type
+        jmp draw_event_panel
+
+?code   jsr event_random3
+        sta event_dest
+        jsr event_random
+        and #1
+        sta event_mode          ; salvage reward or incoming hazard
+        jsr event_random
+        and #1
+        clc
+        adc #1
+        sta event_gain
+        lda #0
+        sta event_entered
+        ldx #0
+?digit  stx event_draw_idx
+        jsr event_random10
+        ldx event_draw_idx
+        sta event_code,x
+        inx
+        cpx #4
+        bne ?digit
+        lda #10
+        sta event_window
+        lda #2
+        sta event_type
+        jmp draw_event_panel
+.endp
+
+.proc tick_events
+        lda event_type
+        beq ?waiting
+        cmp #1
+        beq ?done               ; decision events wait for Y or N
+        cmp #2
+        bne ?result
+        dec event_window
+        bne ?code_running
+        jmp event_code_failed
+?code_running
+        jmp draw_event_panel
+?result
+        dec event_window
+        bne ?draw
+        lda #0
+        sta event_type
+        jsr schedule_next_event
+?draw   jmp draw_event_panel
+?waiting
+        dec event_next_sec
+        bne ?done
+        jmp start_random_event
+?done   rts
+.endp
+
+digit_scan_codes
+        dta $32,$1F,$1E,$1A,$18,$1D,$1B,$33,$35,$30 ; 0..9
+
+.proc scan_event_digit         ; event_scan -> A=digit and C=1, or C=0
+        ldx #9
+?find  lda digit_scan_codes,x
+        cmp event_scan
+        beq ?found
+        dex
+        bpl ?find
+        clc
+        rts
+?found txa
+        sec
+        rts
+.endp
+
+.proc read_event_keyboard      ; C=1 when the event consumed CH
+        lda event_type
+        cmp #1
+        beq ?decision
+        cmp #2
+        beq ?code
+        clc
+        rts
+?decision
+        lda CH
+        cmp #$FF
+        beq ?unused
+        and #$3F
+        cmp #$2B                ; Y
+        beq ?accept
+        cmp #$23                ; N
+        beq ?reject
+?unused clc
+        rts
+?accept
+        lda #$FF
+        sta CH
+        jsr accept_robot_event
+        sec
+        rts
+?reject
+        lda #$FF
+        sta CH
+        lda #4
+        sta event_type
+        lda #2
+        sta event_window
+        jsr draw_event_panel
+        sec
+        rts
+?code   lda CH
+        cmp #$FF
+        beq ?unused
+        and #$3F
+        sta event_scan
+        jsr scan_event_digit
+        bcc ?unused
+        sta event_scan
+        lda #$FF
+        sta CH
+        ldx event_entered
+        lda event_code,x
+        cmp event_scan
+        bne ?wrong
+        inc event_entered
+        lda event_entered
+        cmp #4
+        beq ?complete
+        jsr draw_event_panel
+        sec
+        rts
+?wrong  lda #0
+        sta event_entered       ; a wrong digit restarts the four-digit entry
+        jsr draw_event_panel
+        sec
+        rts
+?complete
+        jsr event_code_success
+        sec
+        rts
+.endp
+
+.proc add_event_resource       ; A=amount, X=Power/Life/Processing
+        clc
+        adc health,x
+        cmp #11
+        bcc ?store
+        lda #10
+?store sta health,x
+        rts
+.endp
+
+.proc subtract_event_resource  ; A=amount, X=Power/Life/Processing
+        sta event_scan
+        lda health,x
+        sec
+        sbc event_scan
+        bcs ?store
+        lda #0
+?store sta health,x
+        rts
+.endp
+
+.proc redraw_after_event
+        jsr check_end
+        lda game_mode
+        bne ?done
+        jsr draw_rows
+        jsr draw_footer
+?done   rts
+.endp
+
+.proc accept_robot_event
+        ldx event_source
+        lda #1
+        jsr subtract_event_resource
+        ldx event_dest
+        lda event_gain
+        jsr add_event_resource
+        lda #3
+        sta event_type
+        lda #3
+        sta event_window
+        jmp redraw_after_event
+.endp
+
+.proc event_code_success
+        lda #0
+        sta event_entered
+        lda event_mode
+        bne ?prevented
+        ldx event_dest
+        lda event_gain
+        jsr add_event_resource
+?prevented
+        lda #3
+        sta event_type
+        lda #3
+        sta event_window
+        jmp redraw_after_event
+.endp
+
+.proc event_code_failed
+        lda #0
+        sta event_entered
+        lda event_mode
+        beq ?missed              ; missed salvage has no additional penalty
+        ldx event_dest
+        lda event_gain
+        jsr subtract_event_resource
+?missed lda #5
+        sta event_type
+        lda #3
+        sta event_window
+        jmp redraw_after_event
+.endp
+
+.proc draw_event_digits        ; four target digits at the current text cursor
+        lda #C_VALUE
+        sta text_col
+        ldx #0
+?digit  stx event_draw_idx
+        lda event_code,x
+        clc
+        adc #16
+        jsr draw_char
+        ldx event_draw_idx
+        inx
+        cpx #4
+        bne ?digit
+        rts
+.endp
+
+.proc draw_entered_digits
+        lda #C_TEXT
+        sta text_col
+        ldx #0
+?digit  stx event_draw_idx
+        cpx event_entered
+        bcs ?blank
+        lda event_code,x
+        clc
+        adc #16
+        bne ?draw
+?blank  lda #63                 ; underscore
+?draw   jsr draw_char
+        ldx event_draw_idx
+        inx
+        cpx #4
+        bne ?digit
+        rts
+.endp
+
+.proc draw_event_panel
+        lda #12
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #131
+        sta calc_y
+        lda #296&255
+        sta fr_w
+        lda #296/256
+        sta fr_w+1
+        lda #17
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_rect
+
+        lda event_type
+        bne ?active
+        rts
+?active
+        lda #12
+        sta calc_x
+        lda #131
+        sta calc_y
+        lda #296&255
+        sta fr_w
+        lda #296/256
+        sta fr_w+1
+        lda #16
+        sta fr_h
+        lda #C_BORDER
+        sta fr_col
+        jsr fill_round_rect
+        lda #14
+        sta calc_x
+        lda #133
+        sta calc_y
+        lda #292&255
+        sta fr_w
+        lda #292/256
+        sta fr_w+1
+        lda #12
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_round_rect
+
+        lda event_type
+        cmp #1
+        beq ?decision
+        cmp #2
+        beq ?code
+        jmp ?result
+
+?decision
+        lda #20
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #135
+        sta text_y
+        lda #<s_event_robot
+        ldx #>s_event_robot
+        ldy #C_TITLE
+        jsr text_at
+        lda #116
+        sta price_x
+        lda #135
+        sta price_y
+        lda #1
+        ldx event_source
+        ldy #13
+        jsr draw_price_term
+        lda event_gain
+        ldx event_dest
+        ldy #11
+        jsr draw_price_term
+        lda #252
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #135
+        sta text_y
+        lda #<s_event_yes_no
+        ldx #>s_event_yes_no
+        ldy #C_VALUE
+        jmp text_at
+
+?code   lda #20
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #135
+        sta text_y
+        lda event_mode
+        bne ?hazard
+        lda #<s_event_salvage
+        ldx #>s_event_salvage
+        bne ?code_title
+?hazard lda #<s_event_hazard
+        ldx #>s_event_hazard
+?code_title
+        ldy #C_TITLE
+        jsr text_at
+        lda #84
+        sta text_x
+        jsr draw_event_digits
+        lda #124
+        sta text_x
+        lda #<s_event_arrow
+        ldx #>s_event_arrow
+        ldy #C_HINT
+        jsr text_at
+        lda #140
+        sta text_x
+        jsr draw_entered_digits
+        lda #220
+        sta text_x
+        lda event_window
+        sta text_col
+        lda #C_DEGRADE
+        sta text_col
+        lda event_window
+        jsr draw_2digit
+        lda #244
+        sta text_x
+        lda #<s_event_seconds
+        ldx #>s_event_seconds
+        ldy #C_HINT
+        jmp text_at
+
+?result
+        lda #20
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #135
+        sta text_y
+        lda event_type
+        cmp #4
+        beq ?rejected
+        cmp #5
+        beq ?failed
+        lda event_mode
+        cmp #1
+        beq ?prevented
+        cmp #2
+        beq ?trade_done
+        lda #<s_event_success
+        ldx #>s_event_success
+        bne ?result_text
+?prevented
+        lda #<s_event_prevented
+        ldx #>s_event_prevented
+        bne ?plain_result
+?trade_done
+        lda #<s_event_trade_done
+        ldx #>s_event_trade_done
+        bne ?result_text
+?rejected
+        lda #<s_event_rejected
+        ldx #>s_event_rejected
+        bne ?plain_result
+?failed
+        lda event_mode
+        beq ?salvage_missed
+        lda #<s_event_failed
+        ldx #>s_event_failed
+        bne ?failed_text
+?salvage_missed
+        lda #<s_event_missed
+        ldx #>s_event_missed
+        bne ?plain_result
+?failed_text
+        ldy #C_OFFLINE
+        jsr text_at
+        lda #180
+        sta price_x
+        lda #135
+        sta price_y
+        lda event_gain
+        ldx event_dest
+        ldy #13
+        jmp draw_price_term
+?result_text
+        ldy #C_ONLINE
+        jsr text_at
+        lda #180
+        sta price_x
+        lda #135
+        sta price_y
+        lda event_gain
+        ldx event_dest
+        ldy #11
+        jmp draw_price_term
+?plain_result
+        ldy #C_TEXT
+        jmp text_at
+.endp
+
+s_event_robot     dta c'ROBOT TRADE',0
+s_event_yes_no    dta c'Y/N',0
+s_event_salvage   dta c'SALVAGE',0
+s_event_hazard    dta c'HAZARD',0
+s_event_arrow     dta c'>',0
+s_event_seconds   dta c'SEC',0
+s_event_success   dta c'SALVAGE SECURED',0
+s_event_prevented dta c'HAZARD PREVENTED',0
+s_event_trade_done dta c'ROBOT TRADE COMPLETE',0
+s_event_rejected  dta c'ROBOT OFFER REJECTED',0
+s_event_failed    dta c'CODE FAILED',0
+s_event_missed    dta c'SALVAGE MISSED',0
 
         run main
