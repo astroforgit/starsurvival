@@ -49,11 +49,13 @@ npm run dev
 
 Open the URL printed by Vite, normally `http://localhost:5173/`.
 
-Starting the browser game opens the cinematic prologue under `intro/`. Space,
-Enter, click, or tap advances the story; Escape or the Skip Intro button opens
-the post-intro operations briefing. From there the player can download the Atari
-VBXE executable or enter the online game. The Atari build continues to use its
-compact native briefing and does not include these web assets.
+Starting the browser game opens the cinematic prologue under `intro/`. Its start
+screen waits for Space, Enter, or the Begin Transmission button so browsers can
+unlock the soundtrack and first narration in sync. Space, Enter, click, or tap
+then advances the story; Escape or the Skip Intro button opens the post-intro
+operations briefing. From there the player can download the Atari VBXE
+executable or enter the online game. The Atari build continues to use its compact
+native briefing and does not include these web assets.
 
 The seven-scene prologue opens with the Orpheus mission and crew manifest,
 introduces Captain Mara Venn and her alien-defence training, then follows a rare

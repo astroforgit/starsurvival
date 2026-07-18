@@ -79,6 +79,8 @@ const scenes = [
 ];
 
 const cinematic = document.querySelector(".cinematic");
+const introGate = document.querySelector(".intro-gate");
+const beginIntroButton = document.querySelector("[data-begin-intro]");
 const layers = [document.querySelector(".scene-a"), document.querySelector(".scene-b")];
 const story = document.querySelector(".story");
 const chapter = document.querySelector(".chapter");
@@ -97,6 +99,7 @@ let fullCopy = "";
 let isTyping = false;
 let leaving = false;
 let sceneChangeTimer = 0;
+let introStarted = false;
 const musicUrl = new URL("./assets/Static in the Void.mp3", import.meta.url).href;
 
 class CinematicAudio {
@@ -118,6 +121,8 @@ class CinematicAudio {
     this.musicEnabled = true;
     this.narrating = false;
     this.carrier = [];
+    this.narrationTimer = 0;
+    this.narrationToken = 0;
   }
 
   armMusic() {
@@ -275,11 +280,12 @@ class CinematicAudio {
     });
   }
 
-  async narrateScene(index) {
+  narrateScene(index) {
     if (!window.speechSynthesis) return;
     this.stopNarration();
+    const token = ++this.narrationToken;
     if (!this.context) this.createEngine();
-    if (this.context) await this.context.resume().catch(() => {});
+    if (this.context) this.context.resume().catch(() => {});
     this.narrating = true;
 
     const utterance = new SpeechSynthesisUtterance(`System archive. ${scenes[index].narration}`);
@@ -294,11 +300,16 @@ class CinematicAudio {
       this.startCarrier();
       this.robotChime();
     }
-    const finish = () => this.finishNarration();
+    const finish = () => {
+      if (token === this.narrationToken) this.finishNarration();
+    };
     utterance.onend = finish;
     utterance.onerror = finish;
-    window.setTimeout(() => {
-      if (this.narrating) window.speechSynthesis.speak(utterance);
+    this.narrationTimer = window.setTimeout(() => {
+      if (this.narrating && token === this.narrationToken) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      }
     }, 260);
   }
 
@@ -331,6 +342,9 @@ class CinematicAudio {
   }
 
   stopNarration() {
+    window.clearTimeout(this.narrationTimer);
+    this.narrationTimer = 0;
+    this.narrationToken++;
     window.speechSynthesis?.cancel();
     if (this.narrating) this.finishNarration();
   }
@@ -397,7 +411,7 @@ function showCrewManifest(crew = []) {
   crewManifest.hidden = crew.length === 0;
 }
 
-function showScene(index) {
+function showScene(index, immediate = false) {
   if (leaving || index < 0 || index >= scenes.length) return;
   clearTimeout(sceneChangeTimer);
   soundtrack.stopNarration();
@@ -405,7 +419,7 @@ function showScene(index) {
   const scene = scenes[index];
   story.classList.add("is-changing");
 
-  sceneChangeTimer = window.setTimeout(() => {
+  const renderScene = () => {
     activeLayer = 1 - activeLayer;
     layers[activeLayer].style.backgroundImage = `url("${scene.image}")`;
     layers[activeLayer].classList.add("is-visible");
@@ -421,11 +435,28 @@ function showScene(index) {
     soundtrack.playScene(index);
     soundtrack.narrateScene(index);
     story.classList.remove("is-changing");
-  }, 280);
+  };
+
+  if (immediate) renderScene();
+  else sceneChangeTimer = window.setTimeout(renderScene, 280);
+}
+
+function beginIntro() {
+  if (introStarted || leaving) return;
+  introStarted = true;
+  introGate.classList.add("is-leaving");
+  soundtrack.armMusic();
+  soundtrack.unlock();
+  showScene(0, true);
+  window.setTimeout(() => introGate.setAttribute("hidden", ""), 720);
 }
 
 function advance() {
   if (leaving) return;
+  if (!introStarted) {
+    beginIntro();
+    return;
+  }
   soundtrack.unlock();
   if (isTyping) {
     finishTyping();
@@ -449,12 +480,22 @@ function enterGame() {
 
 document.querySelector("[data-skip]").addEventListener("click", enterGame);
 document.querySelector("[data-continue]").addEventListener("click", advance);
+beginIntroButton.addEventListener("click", event => {
+  event.stopPropagation();
+  beginIntro();
+});
 musicButton.addEventListener("click", () => soundtrack.toggleMusic());
 cinematic.addEventListener("click", event => {
+  if (!introStarted) return;
   if (!event.target.closest("button, a")) advance();
 });
 
 document.addEventListener("keydown", event => {
+  if (!introStarted && [" ", "Enter"].includes(event.key)) {
+    event.preventDefault();
+    if (!event.repeat) beginIntro();
+    return;
+  }
   if ([" ", "Enter", "ArrowRight"].includes(event.key)) {
     event.preventDefault();
     if (!event.repeat) advance();
@@ -472,5 +513,3 @@ window.addEventListener("pagehide", () => soundtrack.stop(), { once: true });
 
 layers[0].style.backgroundImage = `url("${scenes[0].image}")`;
 cinematic.dataset.scene = "0";
-showScene(0);
-soundtrack.armMusic();
