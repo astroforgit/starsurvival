@@ -14,11 +14,11 @@ const scenes = [
       ["Iona Vale", "Zero-G Yoga Instructor"],
       ["Cassian Rook", "Public Relations Officer"],
       ["Professor Oren Quill", "Space Philosopher"],
-      ["TeeDeeCee", "Fifth-Generation Battle Cyborg // Security Guard"],
-      ["Niko Ember", "Ship's Cook"],
+      ["TeeDeeCee", "Fifth-Generation Battle Cyborg // Security Guard // Cook"],
+      ["Niko Ember", "Cook's Assistant // Deck Cleaner"],
       ["Captain Mara Venn", "Captain // Pilot // Chief Mechanic"]
     ],
-    narration: "Mission file Orpheus. Objective: enter the Cosmic Abyss, cross the final surveyed boundary, and chart the regions of space that no map has ever named. Crew manifest. Doctor Lyra Sen, xenocultural anthropologist. Doctor Elias Ward, psychotherapist. Iona Vale, zero gravity yoga instructor. Cassian Rook, public relations officer. Professor Oren Quill, space philosopher. Tee Dee Cee, fifth-generation battle cyborg and security guard. Niko Ember, ship's cook. Captain Mara Venn, pilot and chief mechanic.",
+    narration: "Mission file Orpheus. Objective: enter the Cosmic Abyss, cross the final surveyed boundary, and chart the regions of space that no map has ever named. Crew manifest. Doctor Lyra Sen, xenocultural anthropologist. Doctor Elias Ward, psychotherapist. Iona Vale, zero gravity yoga instructor. Cassian Rook, public relations officer. Professor Oren Quill, space philosopher. Tee Dee Cee, fifth-generation battle cyborg, security guard, and cook. Niko Ember, cook's assistant and deck cleaner. Captain Mara Venn, pilot and chief mechanic.",
     signal: "Expedition status // Cleared for departure"
   },
   {
