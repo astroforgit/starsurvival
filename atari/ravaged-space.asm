@@ -1323,7 +1323,7 @@ terminal_font
 icon_bits
         dta $18,$18,$30,$7C,$18,$30,$20,$00 ; power: bolt
         dta $66,$FF,$FF,$7E,$3C,$18,$00,$00 ; life support: heart
-        dta $7E,$42,$5A,$42,$5A,$42,$7E,$00 ; processing: core
+        dta $5A,$5A,$5A,$99,$99,$99,$99,$00 ; processing: Atari Fuji
         dta $C3,$66,$3C,$18,$38,$60,$C0,$00 ; engineering: wrench
         dta $18,$7E,$DB,$FF,$BD,$7E,$42,$00 ; guidance: robot
         dta $18,$3C,$7E,$5A,$5A,$3C,$66,$00 ; engines: rocket
