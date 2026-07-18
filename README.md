@@ -47,6 +47,12 @@ Enter, click, or tap advances the story; Escape or the Skip Intro button enters
 the game immediately. The Atari build continues to use its compact native
 briefing and does not include these web assets.
 
+The seven-scene prologue opens with the Orpheus mission and crew manifest,
+introduces Captain Mara Venn and her alien-defence training, then follows a rare
+private moment before the unattended simulation starves the autopilot and
+collision detector of power. The impact, containment, and last-command sequence
+then carries the story into the game.
+
 The prologue uses `intro/assets/Static in the Void.mp3` as its persistent,
 looping dark-space soundtrack. Music is enabled by default when the browser
 permits autoplay and otherwise begins with the first interaction. A separate
