@@ -4,6 +4,9 @@ Cosmic Abyss is a real-time spaceship survival game with two maintained
 implementations: an Atari 8-bit VBXE build and a browser version that mirrors
 the Atari rules and 320x200 systems console.
 
+Cosmic Abyss is heavily inspired by [Ravaged Space](https://straker.itch.io/ravaged-space),
+the original text-based incremental survival game created by Steven Lambert.
+
 ## Project structure
 
 ```text
@@ -14,12 +17,16 @@ the Atari rules and 320x200 systems console.
 |   |-- index.html                Standalone intro entry
 |   |-- intro.css                 Cinematic presentation
 |   `-- intro.js                  Story playback and game handoff
+|-- launch/                       Post-intro operations briefing
+|   |-- index.html                Platform selection and instructions
+|   |-- launch.css                Technical briefing presentation
+|   `-- launch.js                 Atari build download link
 |-- src/
 |   |-- game.js                   Browser game logic and canvas renderer
 |   `-- styles.css                Responsive console and controls
 |-- atari/
-|   |-- ravaged-space.asm         MADS/VBXE source
-|   `-- ravaged-space.xex         Built Atari executable
+|   |-- cosmic-abyss.asm         MADS/VBXE source
+|   `-- cosmic-abyss.xex         Built Atari executable
 |-- docs/
 |   `-- vbxe-fx-1.26-pl.pdf       VBXE hardware reference
 |-- legacy/
@@ -43,9 +50,10 @@ npm run dev
 Open the URL printed by Vite, normally `http://localhost:5173/`.
 
 Starting the browser game opens the cinematic prologue under `intro/`. Space,
-Enter, click, or tap advances the story; Escape or the Skip Intro button enters
-the game immediately. The Atari build continues to use its compact native
-briefing and does not include these web assets.
+Enter, click, or tap advances the story; Escape or the Skip Intro button opens
+the post-intro operations briefing. From there the player can download the Atari
+VBXE executable or enter the online game. The Atari build continues to use its
+compact native briefing and does not include these web assets.
 
 The seven-scene prologue opens with the Orpheus mission and crew manifest,
 introduces Captain Mara Venn and her alien-defence training, then follows a rare
@@ -66,6 +74,21 @@ npm run build       # production build in dist/
 npm run preview     # serve the production build locally
 ```
 
+## GitHub Pages
+
+Pushing `main` deploys the web game and cinematic intro automatically through
+`.github/workflows/deploy-pages.yml`. The workflow builds Vite with the
+`/starsurvival/` repository base path and publishes `dist/` to GitHub Pages.
+
+The deployed routes are:
+
+- Game: `https://astroforgit.github.io/starsurvival/`
+- Intro: `https://astroforgit.github.io/starsurvival/intro/`
+- Operations briefing: `https://astroforgit.github.io/starsurvival/launch/`
+
+In the GitHub repository, select **Settings → Pages → Build and deployment →
+GitHub Actions** once to enable workflow-based publishing.
+
 Keyboard controls use the arrow keys and Space or Enter for the selected action. Matching
 on-screen controls are available for touch devices.
 
@@ -83,8 +106,8 @@ Requires MADS and a VBXE-equipped Atari or compatible emulator.
 npm run build:atari
 ```
 
-The command assembles `atari/ravaged-space.asm` into
-`atari/ravaged-space.xex`.
+The command assembles `atari/cosmic-abyss.asm` into
+`atari/cosmic-abyss.xex`.
 
 Atari controls:
 

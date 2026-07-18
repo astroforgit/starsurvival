@@ -6,7 +6,7 @@ import repairImageUrl from "../pic/repair-web.png";
 import successImageUrl from "../pic/success-web.png";
 
 // Browser equivalents of the Atari data tables. Keep ordering synchronized
-// with health/cooldown/unlocked/clicks in atari/ravaged-space.asm.
+// with health/cooldown/unlocked/clicks in atari/cosmic-abyss.asm.
 const SCR_W = 320;
 const SCR_H = 200;
 const INITIAL_HEALTH = [2, 7, 9, 2, 2, 1, 3];

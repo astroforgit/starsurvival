@@ -443,7 +443,7 @@ function enterGame() {
   soundtrack.stopNarration();
   transition.classList.add("is-active");
   window.setTimeout(() => {
-    window.location.assign(new URL("../?intro=complete", window.location.href));
+    window.location.assign(new URL("../launch/", window.location.href));
   }, 900);
 }
 

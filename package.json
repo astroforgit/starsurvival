@@ -1,5 +1,5 @@
 {
-  "name": "ravaged-space",
+  "name": "cosmic-abyss",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:atari": "mads atari/ravaged-space.asm -o:atari/ravaged-space.xex"
+    "build:atari": "mads atari/cosmic-abyss.asm -o:atari/cosmic-abyss.xex"
   },
   "devDependencies": {
     "vite": "latest"

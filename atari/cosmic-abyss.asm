@@ -1,7 +1,7 @@
 ;=============================================================================
-; ravaged-space.asm - self-contained VBXE survival game. Assemble with MADS:
+; cosmic-abyss.asm - self-contained VBXE survival game. Assemble with MADS:
 ;
-;       mads atari/ravaged-space.asm -o:atari/ravaged-space.xex
+;       mads atari/cosmic-abyss.asm -o:atari/cosmic-abyss.xex
 ;
 ; What it shows, in the order the code does it:
 ;

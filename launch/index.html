@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#020805">
+  <title>Cosmic Abyss — Operations Briefing</title>
+  <link rel="stylesheet" href="./launch.css">
+</head>
+<body>
+  <main class="briefing-shell">
+    <header class="briefing-header">
+      <a class="wordmark" href="../" aria-label="Cosmic Abyss home">
+        <span aria-hidden="true">CA</span>
+        COSMIC ABYSS
+      </a>
+      <p>ORPHEUS RECOVERY TERMINAL // OPERATOR BRIEFING</p>
+    </header>
+
+    <section class="hero" aria-labelledby="briefing-title">
+      <p class="eyebrow">POST-IMPACT OPERATIONS MANUAL</p>
+      <h1 id="briefing-title">Keep the ship alive.<br>Restore the way home.</h1>
+      <p class="lead">The Orpheus is running on damaged systems and borrowed time. Balance its remaining resources, rebuild the main systems, survive emergency events, and recover a route out of the Cosmic Abyss.</p>
+      <p class="inspiration">Cosmic Abyss is heavily inspired by <a href="https://straker.itch.io/ravaged-space" target="_blank" rel="noreferrer">Ravaged Space</a>, the original text-based incremental survival game created by Steven Lambert.</p>
+    </section>
+
+    <section class="protocol" aria-label="Recovery protocol">
+      <article>
+        <span class="step">01</span>
+        <h2>Stabilize resources</h2>
+        <p>Generate Power, cycle Life Support, and mine Processing material. Every action produces one resource while consuming others.</p>
+      </article>
+      <article>
+        <span class="step">02</span>
+        <h2>Repair the ship</h2>
+        <p>Restore Engineering, Guidance, Engines, and Sensors. Repairs add permanent system load, deducted from Power or Life Support every 20 seconds.</p>
+      </article>
+      <article>
+        <span class="step">03</span>
+        <h2>Escape the abyss</h2>
+        <p>Bring every main system to ONLINE status while keeping every critical resource above zero. Special operations unlock as repairs progress.</p>
+      </article>
+    </section>
+
+    <div class="technical-grid">
+      <section class="panel" aria-labelledby="status-heading">
+        <h2 id="status-heading">System telemetry</h2>
+        <dl class="status-scale">
+          <div><dt>0</dt><dd><strong>Destroyed</strong><span>Mission failure</span></dd></div>
+          <div><dt>1–3</dt><dd><strong>Offline</strong><span>Critical condition</span></dd></div>
+          <div><dt>4–7</dt><dd><strong>Degraded</strong><span>Operational risk</span></dd></div>
+          <div><dt>8–10</dt><dd><strong>Online</strong><span>Required to escape</span></dd></div>
+        </dl>
+      </section>
+
+      <section class="panel" aria-labelledby="systems-heading">
+        <h2 id="systems-heading">Resource logic</h2>
+        <ul>
+          <li><strong>Power / Life Support / Processing</strong> fuel repair actions and must never reach zero.</li>
+          <li><strong>Radioactive</strong> is an inverse resource. It begins at zero and rises through failed leaks or dangerous offers.</li>
+          <li><strong>Amount / Auto / Speed</strong> modifications increase output, automate actions, or reduce cooldowns.</li>
+        </ul>
+      </section>
+
+      <section class="panel" aria-labelledby="events-heading">
+        <h2 id="events-heading">Emergency channel</h2>
+        <ul>
+          <li>Respond to robot exchanges with <kbd>Y</kbd> or <kbd>N</kbd>.</li>
+          <li>Enter displayed four-digit codes before the ten-second window closes.</li>
+          <li>Failed hazards damage resources; failed radioactive leaks increase contamination.</li>
+        </ul>
+      </section>
+
+      <section class="panel" aria-labelledby="controls-heading">
+        <h2 id="controls-heading">Operator controls</h2>
+        <ul>
+          <li><kbd>↑</kbd> <kbd>↓</kbd> select a system; <kbd>Space</kbd> or <kbd>Enter</kbd> performs its action.</li>
+          <li><kbd>P</kbd> <kbd>L</kbd> <kbd>O</kbd> <kbd>E</kbd> <kbd>G</kbd> <kbd>N</kbd> <kbd>S</kbd> activate systems directly.</li>
+          <li><kbd>A</kbd> Amount, <kbd>U</kbd> Automation, and <kbd>D</kbd> Speed install modifications.</li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="launch-options" aria-labelledby="launch-heading">
+      <div>
+        <p class="eyebrow">SELECT EXECUTION PLATFORM</p>
+        <h2 id="launch-heading">Choose your command console</h2>
+      </div>
+      <div class="launch-buttons">
+        <a class="launch-button atari" data-atari download="cosmic-abyss.xex">
+          <span>LOAD ATARI VBXE GAME</span>
+          <small>Download the compiled .XEX for VBXE hardware or a compatible emulator</small>
+        </a>
+        <a class="launch-button online" href="../?intro=complete">
+          <span>PLAY GAME ONLINE</span>
+          <small>Open the browser-based 320×200 command console</small>
+        </a>
+      </div>
+    </section>
+
+    <footer>
+      <span>MISSION FILE // ORPHEUS-CA-01</span>
+      <span>LOSS OF ANY CRITICAL SYSTEM IS TERMINAL</span>
+    </footer>
+  </main>
+  <script type="module" src="./launch.js"></script>
+</body>
+</html>

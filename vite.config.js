@@ -1,20 +1,20 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
-function introRoute() {
+function directoryRoutes() {
   const redirect = (request, response, next) => {
     const [pathname, query] = (request.url || "").split("?", 2);
-    if (pathname !== "/intro") {
+    if (!["/intro", "/launch"].includes(pathname)) {
       next();
       return;
     }
     response.statusCode = 302;
-    response.setHeader("Location", `/intro/${query ? `?${query}` : ""}`);
+    response.setHeader("Location", `${pathname}/${query ? `?${query}` : ""}`);
     response.end();
   };
 
   return {
-    name: "cosmic-abyss-intro-route",
+    name: "cosmic-abyss-directory-routes",
     configureServer(server) {
       server.middlewares.use(redirect);
     },
@@ -25,12 +25,13 @@ function introRoute() {
 }
 
 export default defineConfig({
-  plugins: [introRoute()],
+  plugins: [directoryRoutes()],
   build: {
     rollupOptions: {
       input: {
         game: resolve(import.meta.dirname, "index.html"),
-        intro: resolve(import.meta.dirname, "intro/index.html")
+        intro: resolve(import.meta.dirname, "intro/index.html"),
+        launch: resolve(import.meta.dirname, "launch/index.html")
       }
     }
   }
