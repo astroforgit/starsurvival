@@ -20,7 +20,9 @@ const EVENT_TEST_MODE = true;
 const TRADE_PROMPTS = ["OPPORTUNITY", "DO YOU WANT", "HAVE OPTION", "ROBOT OFFER"];
 const SALVAGE_DESCRIPTIONS = ["ALPHA MACHINE", "HELP RESEARCH", "REPAIR DRONE", "RESTORE RELAY"];
 const HAZARD_DESCRIPTIONS = ["COOLANT LEAK", "RESEARCH FIRE", "POWER SURGE", "CORE FAILURE"];
-const ROW_Y = [18, 34, 50, 66, 82, 98, 114];
+const RADIOACTIVE_ICON = 7;
+const RADIOACTIVE_ROW_Y = 60;
+const ROW_Y = [18, 32, 46, 74, 88, 102, 116];
 const ICONS = [
   [0x18, 0x18, 0x30, 0x7c, 0x18, 0x30, 0x20, 0x00], // power: bolt
   [0x66, 0xff, 0xff, 0x7e, 0x3c, 0x18, 0x00, 0x00], // life support: heart
@@ -28,9 +30,10 @@ const ICONS = [
   [0xc3, 0x66, 0x3c, 0x18, 0x38, 0x60, 0xc0, 0x00], // engineering: wrench
   [0x18, 0x7e, 0xdb, 0xff, 0xbd, 0x7e, 0x42, 0x00], // guidance: robot
   [0x18, 0x3c, 0x7e, 0x5a, 0x5a, 0x3c, 0x66, 0x00], // engines: rocket
-  [0x06, 0x0c, 0x58, 0x30, 0x30, 0x7e, 0x18, 0x00]  // sensors: dish
+  [0x06, 0x0c, 0x58, 0x30, 0x30, 0x7e, 0x18, 0x00], // sensors: dish
+  [0x66, 0xc3, 0x81, 0x18, 0x18, 0x24, 0x66, 0x7e]  // radioactive: ☢ trefoil
 ];
-const ICON_COLORS = ["#e8b84c", "#d76a45", "#d89c4a", "#a8aa8d", "#62a881", "#cb7f35", "#778f76"];
+const ICON_COLORS = ["#e8b84c", "#d76a45", "#d89c4a", "#a8aa8d", "#62a881", "#cb7f35", "#778f76", "#d7df42"];
 const TINY_FONT = {
   A: [2, 5, 7, 5, 5], B: [6, 5, 6, 5, 6], C: [3, 4, 4, 4, 3], D: [6, 5, 5, 5, 6],
   E: [7, 4, 6, 4, 7], F: [7, 4, 6, 4, 4], G: [3, 4, 5, 5, 3], H: [5, 5, 7, 5, 5],
@@ -53,6 +56,7 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const announcement = document.querySelector("#announcement");
 const titleScreen = document.querySelector("#title-screen");
 const titleArt = document.querySelector("#title-art");
+const cinematicComplete = new URLSearchParams(window.location.search).get("intro") === "complete";
 titleArt.src = titleImageUrl;
 ctx.imageSmoothingEnabled = false;
 
@@ -85,6 +89,7 @@ let specialDone;
 let specialTimer;
 let storyType;
 let failureSystem;
+let radioactive;
 let deniedUntil;
 let eventType;
 let eventMode;
@@ -97,6 +102,7 @@ let eventCode;
 let eventEntered;
 let eventResult;
 let eventDescription;
+let eventRadioactiveOffer;
 let lastTime = performance.now();
 
 const failureImage = new Image();
@@ -166,6 +172,7 @@ function gameInit() {
   specialTimer = [0, 0, 0, 0, 0, 0, 0];
   storyType = null;
   failureSystem = -1;
+  radioactive = 0;
   deniedUntil = 0;
   initEvents();
   announce("New game. Power selected.");
@@ -191,29 +198,46 @@ function initEvents() {
   eventEntered = "";
   eventResult = "";
   eventDescription = "";
+  eventRadioactiveOffer = false;
   scheduleNextEvent();
   updateEventControls();
 }
 
 function startRandomEvent() {
   const safeSources = [0, 1, 2].filter(index => health[index] >= 2);
-  if (Math.random() < 0.5 && safeSources.length) {
+  eventRadioactiveOffer = false;
+  if (Math.random() < 0.5 && (safeSources.length || radioactive < 10)) {
     eventType = "decision";
     eventMode = "trade";
-    eventSource = safeSources[randomInt(safeSources.length)];
-    const destinations = [0, 1, 2].filter(index => index !== eventSource);
-    eventDest = destinations[randomInt(destinations.length)];
+    eventRadioactiveOffer = radioactive < 10 && (!safeSources.length || Math.random() < 1 / 3);
+    if (eventRadioactiveOffer) {
+      eventSource = RADIOACTIVE_ICON;
+      eventDest = randomInt(3);
+    } else {
+      eventSource = safeSources[randomInt(safeSources.length)];
+      const destinations = [0, 1, 2].filter(index => index !== eventSource);
+      eventDest = destinations[randomInt(destinations.length)];
+    }
     eventGain = 1 + randomInt(2);
     eventDescription = TRADE_PROMPTS[randomInt(TRADE_PROMPTS.length)];
     eventWindow = 10;
   } else {
     eventType = "code";
-    eventMode = Math.random() < 2 / 3 ? "salvage" : "hazard";
-    eventDest = randomInt(3);
+    const modes = ["salvage", "hazard"];
+    if (radioactive < 10) modes.push("radioactiveLeak");
+    if (radioactive > 0) modes.push("clearRadioactiveLeak");
+    eventMode = modes[randomInt(modes.length)];
+    eventDest = eventMode === "salvage" || eventMode === "hazard" ? randomInt(3) : RADIOACTIVE_ICON;
     eventGain = 1 + randomInt(2);
+    if (eventMode === "radioactiveLeak") eventGain = Math.min(eventGain, 10 - radioactive);
+    if (eventMode === "clearRadioactiveLeak") eventGain = Math.min(eventGain, radioactive);
     eventCode = Array.from({ length: 4 }, () => randomInt(10));
-    const descriptions = eventMode === "salvage" ? SALVAGE_DESCRIPTIONS : HAZARD_DESCRIPTIONS;
-    eventDescription = descriptions[randomInt(descriptions.length)];
+    if (eventMode === "radioactiveLeak") eventDescription = "RADIOACTIVE LEAK";
+    else if (eventMode === "clearRadioactiveLeak") eventDescription = "CLEAR RADIOACTIVE LEAK";
+    else {
+      const descriptions = eventMode === "salvage" ? SALVAGE_DESCRIPTIONS : HAZARD_DESCRIPTIONS;
+      eventDescription = descriptions[randomInt(descriptions.length)];
+    }
     eventEntered = "";
     eventWindow = 10;
   }
@@ -235,10 +259,13 @@ function applyEventResource(index, amount) {
 
 function acceptDecisionEvent() {
   if (eventType !== "decision") return false;
-  applyEventResource(eventSource, -1);
+  if (eventRadioactiveOffer) radioactive = clamp(radioactive + 1, 0, 10);
+  else applyEventResource(eventSource, -1);
   applyEventResource(eventDest, eventGain);
   finishEvent("trade");
-  announce(`Robot trade accepted: 1 ${NAMES[eventSource]} for ${eventGain} ${NAMES[eventDest]}.`);
+  announce(eventRadioactiveOffer
+    ? `Robot offer accepted: 1 Radioactive added for ${eventGain} ${NAMES[eventDest]}.`
+    : `Robot trade accepted: 1 ${NAMES[eventSource]} for ${eventGain} ${NAMES[eventDest]}.`);
   checkEnd();
   return true;
 }
@@ -255,6 +282,13 @@ function completeCodeEvent() {
     applyEventResource(eventDest, eventGain);
     finishEvent("salvage");
     announce(`Salvage secured: ${eventGain} ${NAMES[eventDest]}.`);
+  } else if (eventMode === "clearRadioactiveLeak") {
+    radioactive = clamp(radioactive - eventGain, 0, 10);
+    finishEvent("radioactiveCleared");
+    announce(`Radioactive leak cleared. Radioactive decreased to ${radioactive}.`);
+  } else if (eventMode === "radioactiveLeak") {
+    finishEvent("leakPrevented");
+    announce("Radioactive leak prevented.");
   } else {
     finishEvent("prevented");
     announce(`Hazard prevented. ${NAMES[eventDest]} protected.`);
@@ -267,6 +301,13 @@ function failCodeEvent() {
     applyEventResource(eventDest, -eventGain);
     finishEvent("failed");
     announce(`Code failed: lost ${eventGain} ${NAMES[eventDest]}.`);
+  } else if (eventMode === "radioactiveLeak") {
+    radioactive = clamp(radioactive + eventGain, 0, 10);
+    finishEvent("radioactiveIncreased");
+    announce(`Radioactive leak. Radioactive increased to ${radioactive}.`);
+  } else if (eventMode === "clearRadioactiveLeak") {
+    finishEvent("cleanupFailed");
+    announce("Radioactive cleanup failed.");
   } else {
     finishEvent("missed");
     announce("Salvage opportunity missed.");
@@ -315,6 +356,10 @@ function updateEventControls() {
 
 function startGame() {
   if (!titleActive) return false;
+  if (!cinematicComplete) {
+    window.location.assign(new URL("./intro/", window.location.href));
+    return true;
+  }
   titleActive = false;
   briefingActive = true;
   briefingChars = 0;
@@ -327,11 +372,6 @@ function startGame() {
 
 function advanceBriefing() {
   if (!briefingActive) return false;
-  if (briefingChars < BRIEFING_LENGTH) {
-    briefingChars = BRIEFING_LENGTH;
-    drawBriefing();
-    return true;
-  }
   briefingActive = false;
   lastTime = performance.now();
   gameInit();
@@ -576,6 +616,14 @@ function tinyTextAt(text, x, y, color = C.text) {
 }
 
 function drawIcon(index, x, y) {
+  if (index === RADIOACTIVE_ICON) {
+    ctx.fillStyle = ICON_COLORS[index];
+    ctx.font = '10px "DejaVu Sans", "Arial Unicode MS", sans-serif';
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillText("☢", x - 1, y - 2);
+    return;
+  }
   const rows = ICONS[index];
   for (let row = 0; row < 8; row++) {
     for (let column = 0; column < 8; column++) {
@@ -635,6 +683,12 @@ function drawRows() {
     const modification = getModificationState(i);
     if (modification) textAt(modification.text, 288, y + 3, modification.color);
   }
+  drawRadioactiveRow();
+}
+
+function drawRadioactiveRow() {
+  drawIcon(RADIOACTIVE_ICON, 20, RADIOACTIVE_ROW_Y + 3);
+  drawStatusBoxes(radioactive, 32, RADIOACTIVE_ROW_Y + 4, C.offline, C.win);
 }
 
 function drawPriceTerm(value, icon, x, y) {
@@ -677,16 +731,18 @@ function drawLegendItem(index, label, x, y) {
 
 function drawFooter() {
   const legend = [
-    [0, "POWER", 12], [1, "LIFE SUPPORT", 40], [2, "PROCESSING", 96],
-    [3, "ENGINEERING", 144], [4, "GUIDANCE", 196], [5, "ENGINES", 236], [6, "SENSORS", 272]
+    [0, "POWER", 12, 171], [1, "LIFE SUPPORT", 84, 171], [2, "PROCESSING", 164, 171],
+    [RADIOACTIVE_ICON, "RADIOACTIVE", 244, 171],
+    [3, "ENGINEERING", 12, 185], [4, "GUIDANCE", 84, 185],
+    [5, "ENGINES", 164, 185], [6, "SENSORS", 244, 185]
   ];
-  legend.forEach(([index, label, x]) => {
-    drawIcon(index, x, 187);
-    tinyTextAt(label, x + 8, 189);
+  legend.forEach(([index, label, x, y]) => {
+    drawIcon(index, x, y);
+    tinyTextAt(label, x + 8, y + 2);
   });
   if (performance.now() < deniedUntil) {
-    fillRect(10, 176, 300, 9, C.win);
-    textAt("ACTION LOCKED, COOLING, OR TOO COSTLY", 12, 176, C.offline);
+    fillRect(10, 151, 300, 9, C.win);
+    textAt("ACTION LOCKED, COOLING, OR TOO COSTLY", 12, 151, C.offline);
   }
 }
 
@@ -699,7 +755,7 @@ function drawEventPanel() {
 
   if (eventType === "decision") {
     textAt(eventDescription, 20, 134, C.title);
-    drawPriceTerm(-1, eventSource, 124, 134);
+    drawPriceTerm(eventRadioactiveOffer ? 1 : -1, eventSource, 124, 134);
     drawPriceTerm(eventGain, eventDest, 148, 134);
     textAt("Y/N", 268, 134, C.value);
     fillRect(20, 143, 276, 2, C.selected);
@@ -710,8 +766,8 @@ function drawEventPanel() {
   if (eventType === "code") {
     textAt(eventDescription, 20, 134, C.title);
     const remainingCode = eventCode.map((digit, index) => index < eventEntered.length ? " " : digit).join("");
-    textAt(remainingCode, 128, 134, C.value);
-    drawPriceTerm(eventMode === "salvage" ? eventGain : -eventGain, eventDest, 168, 134);
+    textAt(remainingCode, 200, 134, C.value);
+    drawEventEffect(240, 134);
     fillRect(20, 143, 276, 2, C.selected);
     fillRect(20, 143, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
     return;
@@ -723,16 +779,29 @@ function drawEventPanel() {
     salvage: "SALVAGE SECURED",
     prevented: "HAZARD PREVENTED",
     failed: "CODE FAILED",
-    missed: "SALVAGE MISSED"
+    missed: "SALVAGE MISSED",
+    radioactiveCleared: "RADIOACTIVE CLEARED",
+    leakPrevented: "LEAK PREVENTED",
+    radioactiveIncreased: `RADIOACTIVE +${eventGain}`,
+    cleanupFailed: "CLEANUP FAILED"
   }[eventResult];
-  const color = eventResult === "failed" ? C.offline :
-    ["trade", "salvage"].includes(eventResult) ? C.online : C.text;
+  const color = ["failed", "radioactiveIncreased", "cleanupFailed"].includes(eventResult) ? C.offline :
+    ["trade", "salvage", "radioactiveCleared", "leakPrevented"].includes(eventResult) ? C.online : C.text;
   textAt(resultText, 20, 134, color);
   if (eventResult === "trade") {
-    drawPriceTerm(eventGain, eventDest, 180, 134);
-  } else if (["salvage", "prevented", "failed", "missed"].includes(eventResult)) {
-    drawPriceTerm(eventMode === "salvage" ? eventGain : -eventGain, eventDest, 180, 134);
+    if (eventRadioactiveOffer) {
+      drawPriceTerm(1, RADIOACTIVE_ICON, 156, 134);
+      drawPriceTerm(eventGain, eventDest, 180, 134);
+    } else drawPriceTerm(eventGain, eventDest, 180, 134);
+  } else if (["salvage", "prevented", "failed", "missed", "radioactiveCleared", "leakPrevented", "radioactiveIncreased", "cleanupFailed"].includes(eventResult)) {
+    drawEventEffect(180, 134);
   }
+}
+
+function drawEventEffect(x, y) {
+  if (eventMode === "radioactiveLeak") drawPriceTerm(eventGain, RADIOACTIVE_ICON, x, y);
+  else if (eventMode === "clearRadioactiveLeak") drawPriceTerm(-eventGain, RADIOACTIVE_ICON, x, y);
+  else drawPriceTerm(eventMode === "salvage" ? eventGain : -eventGain, eventDest, x, y);
 }
 
 function drawEnd() {
@@ -1001,6 +1070,14 @@ function loop(now) {
   }
   if (!titleActive && !briefingActive) drawScreen();
   requestAnimationFrame(loop);
+}
+
+if (cinematicComplete) {
+  titleActive = false;
+  briefingActive = false;
+  titleScreen.classList.add("is-hidden");
+  window.history.replaceState({}, "", window.location.pathname);
+  gameInit();
 }
 
 requestAnimationFrame(loop);

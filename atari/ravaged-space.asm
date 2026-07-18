@@ -105,7 +105,7 @@ C_SELECT  = 15
 C_COOLDOWN = 16
 C_LOADPROG = 17
 C_ICON_BASE = 18
-C_NOISE   = 25                  ; faint phosphor grain; icon colours stay 18..24
+C_NOISE   = 26                  ; faint phosphor grain; icon colours stay 18..25
 
 ; ---- game layout ----
 WIN_X   = 4
@@ -173,7 +173,10 @@ txt_ptr = $D7                   ; 2 - draw_text's string
         jsr draw_title_screen
         jsr wait_title_input
         jsr draw_briefing_screen
+        lda brief_skipped
+        bne ?begin_game
         jsr wait_title_input
+?begin_game
         jsr game_init
         jsr draw_screen
         jmp loop
@@ -215,6 +218,7 @@ special_sec dta 0,0,0,0,0,0,0
 special_frac dta 0,0,0,0,0,0,0
 story_type dta 0
 failure_system dta $FF
+radioactive dta 0               ; inverse resource: zero is safe, ten is maximum
 relax_sec dta 0
 relax_done dta 0
 relax_release dta 0
@@ -305,6 +309,7 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         sta modal_type
         sta amount_opened
         sta story_type
+        sta radioactive
         sta relax_done
         sta relax_release
         sta old_stick
@@ -1162,7 +1167,8 @@ pal_tab
         dta 22,112,200,192      ; guidance robot
         dta 23,232,144, 56      ; engines rocket
         dta 24,144,158,216      ; sensors dish
-        dta 25, 10, 46, 25      ; low-contrast CRT colour noise
+        dta 25,220,224, 62      ; radioactive trefoil
+        dta 26, 10, 46, 25      ; low-contrast CRT colour noise
         dta 32,  0,  4,  1      ; title artwork: 16-step green ramp
         dta 33,  1, 12,  2
         dta 34,  2, 22,  4
@@ -1328,7 +1334,8 @@ icon_bits
         dta $18,$7E,$DB,$FF,$BD,$7E,$42,$00 ; guidance: robot
         dta $18,$3C,$7E,$5A,$5A,$3C,$66,$00 ; engines: rocket
         dta $06,$0C,$58,$30,$30,$7E,$18,$00 ; sensors: dish
-icon_cols dta 18,19,20,21,22,23,24
+        dta $66,$C3,$81,$18,$18,$24,$66,$7E ; radioactive: radiation trefoil
+icon_cols dta 18,19,20,21,22,23,24,25
 icon_idx  dta 0
 icon_rows dta 0
 icon_cols_left dta 0
@@ -1374,7 +1381,7 @@ icon_cols_left dta 0
         bne ?row
         inc icon_idx
         lda icon_idx
-        cmp #7
+        cmp #8
         bne ?icon
         lda #0
         sta VBXE_BANK_SEL
@@ -2311,6 +2318,7 @@ brief_glyph dta 0
 brief_x dta a(0)
 brief_y dta 0
 brief_text_col dta 48
+brief_skipped dta 0
 
 .proc draw_brief_glyph
         sta brief_glyph
@@ -2425,11 +2433,23 @@ brief_text_col dta 48
         jsr wait_frame
         jsr wait_frame
         jsr wait_frame
+        lda CH
+        and #$3F
+        cmp #$21                ; Space skips the briefing immediately
+        bne ?continue
+        lda #$FF
+        sta CH
+        lda #1
+        sta brief_skipped
+        rts
+?continue
         jmp ?char
 ?done  rts
 .endp
 
 .proc draw_briefing_screen
+        lda #0
+        sta brief_skipped
         jsr wait_blit
         lda #0
         sta title_bank
@@ -2495,6 +2515,10 @@ brief_text_col dta 48
         lda #>s_brief_line1
         sta txt_ptr+1
         jsr type_brief_line
+        lda brief_skipped
+        beq ?line2
+        jmp ?skipped
+?line2
         lda #36
         sta text_x
         lda #0
@@ -2506,6 +2530,10 @@ brief_text_col dta 48
         lda #>s_brief_line2
         sta txt_ptr+1
         jsr type_brief_line
+        lda brief_skipped
+        beq ?line3
+        jmp ?skipped
+?line3
         lda #36
         sta text_x
         lda #0
@@ -2517,6 +2545,10 @@ brief_text_col dta 48
         lda #>s_brief_line3
         sta txt_ptr+1
         jsr type_brief_line
+        lda brief_skipped
+        beq ?line4
+        jmp ?skipped
+?line4
         lda #32
         sta text_x
         lda #0
@@ -2528,6 +2560,10 @@ brief_text_col dta 48
         lda #>s_brief_line4
         sta txt_ptr+1
         jsr type_brief_line
+        lda brief_skipped
+        beq ?line5
+        jmp ?skipped
+?line5
         lda #32
         sta text_x
         lda #0
@@ -2539,6 +2575,8 @@ brief_text_col dta 48
         lda #>s_brief_line5
         sta txt_ptr+1
         jsr type_brief_line
+        lda brief_skipped
+        bne ?skipped
 
         lda #80
         sta text_x
@@ -2553,6 +2591,8 @@ brief_text_col dta 48
         lda #49
         sta brief_text_col
         jmp draw_brief_text
+?skipped
+        rts
 .endp
 
 .proc wait_title_input
@@ -2665,7 +2705,7 @@ brief_text_col dta 48
         jmp text_at
 .endp
 
-row_y_tab dta 18,34,50,66,82,98,114
+row_y_tab dta 18,32,46,74,88,102,116
 
 ; Fractional width tables avoid division in the frame loop. A normal cooldown
 ; advances through eight pixels per second; the speed upgrade uses sixteen.
@@ -2918,6 +2958,61 @@ status_col dta 0
         sta fr_col
         jsr fill_rect
 ?next   inc status_cell
+        lda status_x
+        clc
+        adc #8
+        sta status_x
+        lda status_cell
+        cmp #10
+        bne ?cell
+        rts
+.endp
+
+.proc draw_radioactive_row
+        lda #20
+        sta icon_draw_x
+        lda #0
+        sta icon_draw_x+1
+        lda #63
+        sta icon_draw_y
+        ldx #7
+        jsr draw_icon
+        lda #0
+        sta status_cell
+        lda #BAR_X
+        sta status_x
+?cell  lda status_x
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #64
+        sta calc_y
+        lda #7
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #6
+        sta fr_h
+        lda status_cell
+        cmp radioactive
+        bcs ?empty
+        lda #C_OFFLINE
+        sta fr_col
+        jsr fill_round_cell
+        jmp ?next
+?empty lda #C_TEXT
+        sta fr_col
+        jsr fill_round_cell
+        inc calc_x
+        inc calc_y
+        lda #5
+        sta fr_w
+        lda #4
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_rect
+?next  inc status_cell
         lda status_x
         clc
         adc #8
@@ -3203,7 +3298,7 @@ resource_key_glyph dta 48,44,47             ; P,L,O
         beq ?done
         jmp ?row
 ?done
-        rts
+        jmp draw_radioactive_row
 ?idx    dta 0
 .endp
 
@@ -3273,6 +3368,7 @@ tiny_icon_bits
         dta 6,15,11,15           ; guidance
         dta 6,15,10,5            ; engines
         dta 1,10,6,4             ; sensors
+        dta 6,9,6,15             ; radioactive
 tiny_masks dta 4,2,1
 tiny_icon_masks dta 8,4,2,1
 tiny_x dta a(0)
@@ -3461,45 +3557,53 @@ tiny_colour dta C_TEXT
         sta tiny_x
         lda #0
         sta tiny_x+1
-        lda #189
+        lda #173
         sta tiny_y
         lda #<s_power
         ldx #>s_power
         ldy #0
         jsr draw_tiny_legend_item
-        lda #40
+        lda #84
         sta tiny_x
         lda #<s_life
         ldx #>s_life
         ldy #1
         jsr draw_tiny_legend_item
-        lda #96
+        lda #164
         sta tiny_x
         lda #<s_process
         ldx #>s_process
         ldy #2
         jsr draw_tiny_legend_item
-        lda #144
+        lda #244
         sta tiny_x
+        lda #<s_radioactive
+        ldx #>s_radioactive
+        ldy #7
+        jsr draw_tiny_legend_item
+        lda #12
+        sta tiny_x
+        lda #187
+        sta tiny_y
         lda #<s_engineer
         ldx #>s_engineer
         ldy #3
         jsr draw_tiny_legend_item
-        lda #196
+        lda #84
         sta tiny_x
         lda #<s_guidance
         ldx #>s_guidance
         ldy #4
         jsr draw_tiny_legend_item
-        lda #236
+        lda #164
         sta tiny_x
         lda #<s_engines
         ldx #>s_engines
         ldy #5
         jsr draw_tiny_legend_item
-        lda #16
+        lda #244
         sta tiny_x
-        lda #1
+        lda #0
         sta tiny_x+1
         lda #<s_sensors
         ldx #>s_sensors
@@ -3557,7 +3661,7 @@ crt_noise_points
         sta text_x
         lda #0
         sta text_x+1
-        lda #176
+        lda #151
         sta text_y
         lda #<s_denied
         ldx #>s_denied
@@ -4217,6 +4321,7 @@ amount_new_cost dta 2,1,2
 s_power    dta c'POWER',0
 s_life     dta c'LIFE SUPPORT',0
 s_process  dta c'PROCESSING',0
+s_radioactive dta c'RADIOACTIVE',0
 s_engineer dta c'ENGINEERING',0
 s_guidance dta c'GUIDANCE',0
 s_engines  dta c'ENGINES',0
@@ -4321,7 +4426,8 @@ shower_bitmap
 ; Random event strip
 ;   type 0 = idle, 1 = robot decision, 2 = four-digit challenge
 ;        3 = success, 4 = rejected, 5 = failed/missed
-;   mode 0 = salvage reward, 1 = hazard, 2 = robot trade
+;   mode 0 = salvage, 1 = hazard, 2 = radioactive leak,
+;        3 = clear radioactive leak, 4 = robot trade
 ;=============================================================================
 event_type      dta 0
 event_mode      dta 0
@@ -4332,6 +4438,7 @@ event_dest      dta 0
 event_gain      dta 0
 event_desc      dta 0
 event_trade_desc dta 0
+event_radio_offer dta 0         ; +1 Radioactive in exchange for another resource
 event_rng       dta 1
 event_entered   dta 0
 event_code      dta 0,0,0,0
@@ -4398,12 +4505,31 @@ event_tries     dta 0
 .endp
 
 .proc start_random_event
+        lda #0
+        sta event_radio_offer
         jsr event_random
         and #1
         bne ?code
 
+        ; Some robot offers grant a normal resource while adding one point of
+        ; Radioactive as the cost instead of deducting a normal resource.
+        jsr event_random
+        and #3
+        bne ?normal_trade
+        lda radioactive
+        cmp #10
+        bcs ?normal_trade
+        lda #1
+        sta event_radio_offer
+        lda #7
+        sta event_source
+        jsr event_random3
+        sta event_dest
+        jmp ?trade_gain
+
         ; Find a resource with at least two points, so accepting a trade can
         ; never destroy Power, Life Support, or Processing immediately.
+?normal_trade
         jsr event_random3
         sta event_source
         lda #3
@@ -4429,6 +4555,7 @@ event_tries     dta 0
         cmp event_source
         beq ?dest
         sta event_dest
+?trade_gain
         jsr event_random
         and #1
         clc
@@ -4439,22 +4566,32 @@ event_tries     dta 0
         sta event_trade_desc
         lda #10
         sta event_window        ; same ten-second window as code challenges
-        lda #2
+        lda #4
         sta event_mode
         lda #1
         sta event_type
         jmp draw_event_panel
 
-?code   jsr event_random3
-        sta event_dest
-        jsr event_random3       ; two salvage events for every one hazard
-        beq ?hazard_mode
-        lda #0
-        beq ?store_mode
-?hazard_mode
-        lda #1
+?code   jsr event_random
+        and #3
+        cmp #2
+        bne ?check_cleanup
+        ldx radioactive         ; a full meter cannot receive another leak
+        cpx #10
+        bne ?store_mode
+        lda #3
+?check_cleanup
+        cmp #3
+        bne ?store_mode
+        ldx radioactive         ; do not offer cleanup when radiation is zero
+        bne ?store_mode
+        lda #2
 ?store_mode
-        sta event_mode          ; salvage reward or incoming hazard
+        sta event_mode
+        cmp #2
+        bcs ?radioactive_target
+        jsr event_random3
+        sta event_dest
         jsr event_random
         and #1
         clc
@@ -4463,6 +4600,33 @@ event_tries     dta 0
         jsr event_random
         and #3
         sta event_desc
+        jmp ?prepare_code
+?radioactive_target
+        lda #7
+        sta event_dest
+        jsr event_random
+        and #1
+        clc
+        adc #1
+        sta event_gain
+        lda event_mode
+        cmp #2
+        bne ?limit_cleanup
+        lda radioactive
+        cmp #9
+        bne ?radioactive_desc
+        lda #1                  ; only one point fits below the maximum
+        sta event_gain
+        jmp ?radioactive_desc
+?limit_cleanup
+        lda radioactive
+        cmp #1
+        bne ?radioactive_desc
+        sta event_gain          ; cleanup cannot remove more than is present
+?radioactive_desc
+        lda #0
+        sta event_desc
+?prepare_code
         lda #0
         sta event_entered
         ldx #0
@@ -4631,9 +4795,15 @@ digit_scan_codes
 .endp
 
 .proc accept_robot_event
+        lda event_radio_offer
+        beq ?normal_cost
+        inc radioactive
+        jmp ?reward
+?normal_cost
         ldx event_source
         lda #1
         jsr subtract_event_resource
+?reward
         ldx event_dest
         lda event_gain
         jsr add_event_resource
@@ -4648,7 +4818,19 @@ digit_scan_codes
         lda #0
         sta event_entered
         lda event_mode
+        beq ?salvage
+        cmp #3
         bne ?prevented
+        lda radioactive
+        beq ?prevented
+        sec
+        sbc event_gain
+        bcs ?store_radioactive
+        lda #0
+?store_radioactive
+        sta radioactive
+        jmp ?prevented
+?salvage
         ldx event_dest
         lda event_gain
         jsr add_event_resource
@@ -4665,9 +4847,23 @@ digit_scan_codes
         sta event_entered
         lda event_mode
         beq ?missed              ; missed salvage has no additional penalty
+        cmp #2
+        beq ?radioactive_leak
+        cmp #3
+        beq ?missed              ; failed cleanup leaves radiation unchanged
         ldx event_dest
         lda event_gain
         jsr subtract_event_resource
+        jmp ?missed
+?radioactive_leak
+        lda radioactive
+        clc
+        adc event_gain
+        cmp #11
+        bcc ?store_radioactive
+        lda #10
+?store_radioactive
+        sta radioactive
 ?missed lda #5
         sta event_type
         lda #1                  ; rapid test mode: one-second result flash
@@ -4729,13 +4925,17 @@ event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
 .endp
 
 .proc draw_event_effect
-        lda #168
+        lda #240
         sta price_x
         lda #0
         sta price_x+1
         lda #134
         sta price_y
         lda event_mode
+        cmp #2
+        beq ?radioactive_gain
+        cmp #3
+        beq ?radioactive_loss
         cmp #1
         beq ?loss
         lda event_gain
@@ -4745,6 +4945,16 @@ event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
 ?loss   lda event_gain
         ldx event_dest
         ldy #13                 ; '-' followed by the resource icon
+        jmp draw_price_term
+?radioactive_gain
+        lda event_gain
+        ldx #7
+        ldy #11
+        jmp draw_price_term
+?radioactive_loss
+        lda event_gain
+        ldx #7
+        ldy #13
         jmp draw_price_term
 .endp
 
@@ -4833,6 +5043,12 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         lda #1
         ldx event_source
         ldy #13
+        pha
+        lda event_radio_offer
+        beq ?normal_offer_sign
+        ldy #11
+?normal_offer_sign
+        pla
         jsr draw_price_term
         lda event_gain
         ldx event_dest
@@ -4858,7 +5074,12 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta text_y
         ldx event_desc
         lda event_mode
-        bne ?hazard
+        cmp #2
+        beq ?radioactive_leak
+        cmp #3
+        beq ?radioactive_clear
+        cmp #1
+        beq ?hazard
         lda salvage_desc_lo,x
         sta txt_ptr
         lda salvage_desc_hi,x
@@ -4868,12 +5089,24 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta txt_ptr
         lda hazard_desc_hi,x
         sta txt_ptr+1
+        bne ?code_title
+?radioactive_leak
+        lda #<s_event_radioactive_leak
+        sta txt_ptr
+        lda #>s_event_radioactive_leak
+        sta txt_ptr+1
+        bne ?code_title
+?radioactive_clear
+        lda #<s_event_radioactive_clear
+        sta txt_ptr
+        lda #>s_event_radioactive_clear
+        sta txt_ptr+1
 ?code_title
         lda txt_ptr
         ldx txt_ptr+1
         ldy #C_TITLE
         jsr text_at
-        lda #128
+        lda #200
         sta text_x
         jsr draw_event_digits
         jsr draw_event_effect
@@ -4895,6 +5128,10 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         cmp #1
         beq ?prevented
         cmp #2
+        beq ?leak_prevented
+        cmp #3
+        beq ?radioactive_cleared
+        cmp #4
         beq ?trade_done
         lda #<s_event_success
         ldx #>s_event_success
@@ -4903,6 +5140,14 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         lda #<s_event_prevented
         ldx #>s_event_prevented
         bne ?plain_effect
+?leak_prevented
+        lda #<s_event_leak_prevented
+        ldx #>s_event_leak_prevented
+        bne ?result_text
+?radioactive_cleared
+        lda #<s_event_radioactive_cleared
+        ldx #>s_event_radioactive_cleared
+        bne ?result_text
 ?trade_done
         lda #<s_event_trade_done
         ldx #>s_event_trade_done
@@ -4914,8 +5159,20 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
 ?failed
         lda event_mode
         beq ?salvage_missed
+        cmp #2
+        beq ?radioactive_increased
+        cmp #3
+        beq ?cleanup_failed
         lda #<s_event_failed
         ldx #>s_event_failed
+        bne ?failed_text
+?radioactive_increased
+        lda #<s_event_radioactive_increased
+        ldx #>s_event_radioactive_increased
+        bne ?failed_text
+?cleanup_failed
+        lda #<s_event_cleanup_failed
+        ldx #>s_event_cleanup_failed
         bne ?failed_text
 ?salvage_missed
         lda #<s_event_missed
@@ -4928,6 +5185,22 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
 ?result_text
         ldy #C_ONLINE
         jsr text_at
+        lda event_mode
+        cmp #4
+        bne ?draw_result_effect
+        lda event_radio_offer
+        beq ?draw_result_effect
+        lda #216
+        sta price_x
+        lda #0
+        sta price_x+1
+        lda #134
+        sta price_y
+        lda #1
+        ldx #7
+        ldy #11
+        jsr draw_price_term
+?draw_result_effect
         jmp draw_event_effect
 ?plain_effect
         ldy #C_TEXT
@@ -4951,8 +5224,14 @@ s_event_leak      dta c'COOLANT LEAK',0
 s_event_fire      dta c'RESEARCH FIRE',0
 s_event_surge     dta c'POWER SURGE',0
 s_event_core      dta c'CORE FAILURE',0
+s_event_radioactive_leak dta c'RADIOACTIVE LEAK',0
+s_event_radioactive_clear dta c'CLEAR RADIOACTIVE LEAK',0
 s_event_success   dta c'SALVAGE SECURED',0
 s_event_prevented dta c'HAZARD PREVENTED',0
+s_event_leak_prevented dta c'LEAK PREVENTED',0
+s_event_radioactive_cleared dta c'RADIOACTIVE CLEARED',0
+s_event_radioactive_increased dta c'RADIOACTIVE INCREASED',0
+s_event_cleanup_failed dta c'CLEANUP FAILED',0
 s_event_trade_done dta c'ROBOT TRADE DONE',0
 s_event_rejected  dta c'ROBOT OFFER REJECTED',0
 s_event_failed    dta c'CODE FAILED',0

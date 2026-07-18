@@ -9,6 +9,11 @@ the Atari rules and 320x200 systems console.
 ```text
 .
 |-- index.html                    Vite HTML entry
+|-- intro/                        Web-only cinematic prologue
+|   |-- assets/                   Generated cinematic artwork
+|   |-- index.html                Standalone intro entry
+|   |-- intro.css                 Cinematic presentation
+|   `-- intro.js                  Story playback and game handoff
 |-- src/
 |   |-- game.js                   Browser game logic and canvas renderer
 |   `-- styles.css                Responsive console and controls
@@ -36,6 +41,19 @@ npm run dev
 ```
 
 Open the URL printed by Vite, normally `http://localhost:5173/`.
+
+Starting the browser game opens the cinematic prologue under `intro/`. Space,
+Enter, click, or tap advances the story; Escape or the Skip Intro button enters
+the game immediately. The Atari build continues to use its compact native
+briefing and does not include these web assets.
+
+The prologue uses `intro/assets/Static in the Void.mp3` as its persistent,
+looping dark-space soundtrack. Music is enabled by default when the browser
+permits autoplay and otherwise begins with the first interaction. A separate
+low robotic system voice with a retro transmission
+carrier automatically narrates every scene as it appears; changing scenes stops
+the previous line without interrupting the music. All spoken lines remain visible
+as captions, and scenes advance only on keyboard, click, or tap input.
 
 ```sh
 npm run build       # production build in dist/
@@ -66,6 +84,7 @@ Atari controls:
 
 - joystick up/down selects a system
 - Space performs the selected system action
+- Space during the opening briefing skips directly to the game
 - joystick left purchases the Amount modification
 - joystick right purchases the speed modification
 - keyboard `P/L/O/E/G/N/S` performs the corresponding action directly
@@ -121,13 +140,20 @@ messages are drawn with the VBXE blitter. The browser Canvas implementation keep
 the same state-array ordering and closely matching game and drawing routines.
 
 System condition is displayed as ten individually bordered boxes, following the
-original browser interface. Seven custom 8x8 icons identify Power, Life Support,
-Processing, Engineering, Guidance, Engines, and Sensors. The browser and Atari
+original browser interface. Eight custom 8x8 icons identify Power, Life Support,
+Processing, Radioactive, Engineering, Guidance, Engines, and Sensors. The browser and Atari
 versions share the same pixel masks; Atari expands them into coloured sprites at
 VBXE VRAM `$039000` and draws each icon with one transparent blit.
 
+Radioactive is an inverse resource displayed directly below Processing. It starts
+at zero and has no keyboard action. A failed four-digit `RADIOACTIVE LEAK` event
+adds one or two points, while a successful `CLEAR RADIOACTIVE LEAK` event removes
+one or two points. Both events show their signed change beside the radioactive
+trefoil icon. Some robot offers also grant a normal resource in exchange for
+adding one Radioactive point; both effects are displayed before accepting.
+
 The 320x200 console uses compact `STATUS`, `ACTION`, `LOAD`, and `MODS` columns.
-System rows show icons only; the full icon names are collected in a three-line
+System rows show icons only; the full icon names are collected in a two-line
 legend at the bottom.
 
 The first table column displays an action shortcut only while that action can be
