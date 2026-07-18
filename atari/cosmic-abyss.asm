@@ -80,7 +80,7 @@ BCB_OFF   = $100
 FONT_BANK = $38                 ; font sheet at $038000: 64 glyphs x 8x8, padded to 64 B
 FONT_HI   = $80                 ; so glyph addr = $038000 + (gi<<6)
 FONT_B2   = $03
-ICON_BANK = $39                 ; seven coloured 8x8 system icons at $039000
+ICON_BANK = $39                 ; eight coloured 8x8 system icons at $039000
 ICON_HI   = $90
 ICON_B2   = $03
 
@@ -1324,7 +1324,7 @@ terminal_font
         dta $10,$28,$44,$00,$00,$00,$00,$00 ; ^
         dta $00,$00,$00,$00,$00,$00,$7C,$00 ; _
 
-; Seven custom 8x8 icons, shared pixel-for-pixel with src/game.js. They are
+; Eight custom 8x8 icons, shared pixel-for-pixel with src/game.js. They are
 ; expanded once into coloured VBXE sprites; zero remains transparent.
 icon_bits
         dta $18,$18,$30,$7C,$18,$30,$20,$00 ; power: bolt
@@ -1334,7 +1334,7 @@ icon_bits
         dta $18,$7E,$DB,$FF,$BD,$7E,$42,$00 ; guidance: robot
         dta $18,$3C,$7E,$5A,$5A,$3C,$66,$00 ; engines: rocket
         dta $06,$0C,$58,$30,$30,$7E,$18,$00 ; sensors: dish
-        dta $66,$C3,$81,$18,$18,$24,$66,$7E ; radioactive: radiation trefoil
+        dta $3C,$7E,$A5,$99,$DB,$E7,$66,$3C ; radioactive: circular radiation trefoil
 icon_cols dta 18,19,20,21,22,23,24,25
 icon_idx  dta 0
 icon_rows dta 0
@@ -3368,7 +3368,7 @@ tiny_icon_bits
         dta 6,15,11,15           ; guidance
         dta 6,15,10,5            ; engines
         dta 1,10,6,4             ; sensors
-        dta 6,9,6,15             ; radioactive
+        dta 6,15,9,6             ; radioactive
 tiny_masks dta 4,2,1
 tiny_icon_masks dta 8,4,2,1
 tiny_x dta a(0)
@@ -3583,6 +3583,8 @@ tiny_colour dta C_TEXT
         jsr draw_tiny_legend_item
         lda #12
         sta tiny_x
+        lda #0
+        sta tiny_x+1             ; clear carry from the long RADIOACTIVE label
         lda #187
         sta tiny_y
         lda #<s_engineer
