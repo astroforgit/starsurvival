@@ -32,9 +32,6 @@
 ;      p to 2*(_color+3)-p; for _color+N that is simply _color+(6-N). So the same
 ;      five colours, read backwards, give you the pressed look for free.
 ;
-;   Controls: joystick 0 up/down changes the number (click, then auto-repeat with
-;   acceleration, like the original). There is no exit -- switch the machine off.
-;
 ; Needs a VBXE. Without one it just flashes the border and stops.
 ;=============================================================================
 
@@ -43,7 +40,7 @@ SDMCTL   = $022F                ; OS shadow of DMACTL; the VBI copies it every f
 COLOR4   = $02C8
 CH       = $02FC                ; OS keyboard scan-code shadow, $FF = no key
 RTCLOK   = $12                  ; three-byte OS frame clock; RTCLOK+2 changes fastest
-PORTA    = $D300                ; joystick 0 in bits 0..3 (up, down, left, right; 0 = pushed)
+PORTA    = $D300                ; controller port 0 direction bits (0 = pushed)
 PORTB    = $D301                ; XL/XE memory control; bit 1 exposes RAM under BASIC
 STRIG0   = $D010
 DMACTL   = $D400
@@ -5439,7 +5436,7 @@ s_event_missed    dta c'SALVAGE MISSED',0
 .endp
 
 ; The relaxation popup uses the briefing's outlined glyph renderer, but its
-; per-character delay watches both Space and FIRE. A held joystick button must
+; per-character delay watches both Space and FIRE. A held controller button must
 ; first be released, preventing the action that opened the screen from
 ; dismissing it immediately.
 relax_type_skip dta 0

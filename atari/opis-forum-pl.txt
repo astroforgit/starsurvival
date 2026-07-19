@@ -1,0 +1,26 @@
+COSMIC ABYSS – gra survivalowa dla Atari 8-bit z VBXE
+
+Cosmic Abyss to krótka, wymagająca gra strategiczno-survivalowa dla Atari XL/XE. Produkcja jest mocno inspirowana grą Ravaged Space autorstwa Stevena Lamberta, ale została rozbudowana o oprawę VBXE, nowe zdarzenia, promieniowanie i własną historię.
+
+FABUŁA
+
+Statek badawczy Orpheus wyrusza poza granice poznanej przestrzeni, aby zbadać tajemniczy Kosmiczny Bezkres. Awaria systemu obrony i chwilowe wyłączenie autopilota kończą się zderzeniem z asteroidą. Kadłub zostaje uszkodzony, zasilanie zanika, a systemy podtrzymywania życia zaczynają zawodzić. Kapitan Mara Venn musi utrzymać załogę przy życiu, naprawić statek i odnaleźć drogę powrotną.
+
+JAK GRAĆ
+
+Celem jest doprowadzenie czterech głównych systemów – Inżynierii, Nawigacji, Silników i Sensorów – do stanu ONLINE. Jednocześnie należy produkować energię, podtrzymywać życie i zdobywać materiały do przetwarzania. Każda akcja daje określony zasób, ale może zużywać inne. Jeżeli którykolwiek z kluczowych systemów spadnie do zera, misja kończy się katastrofą.
+
+Naprawy zwiększają stałe obciążenie statku, odejmowane co 20 sekund. Modyfikacje Amount, Auto i Speed zwiększają wydajność, automatyzują produkcję lub skracają czas oczekiwania. Podczas gry pojawiają się oferty robotów, awarie i czterocyfrowe kody alarmowe. Radioactive jest zasobem odwrotnym: zaczyna od zera, a nieudane akcje mogą zwiększać poziom skażenia.
+
+STEROWANIE
+
+- P/L/O/E/G/N/S – bezpośrednie uruchomienie akcji systemu
+- A/U/D – zakup modyfikacji Amount, Auto lub Speed
+- Y/N – przyjęcie lub odrzucenie oferty
+- klawisze 0–9 – wprowadzanie czterocyfrowych kodów alarmowych
+
+WYMAGANIA
+
+Gra wymaga komputera Atari XL/XE wyposażonego w rozszerzenie VBXE albo emulatora z poprawną obsługą VBXE. Uruchamiany plik: cosmic-abyss.xex.
+
+Powodzenia, Kapitanie. W Kosmicznym Bezkresie każda sekunda i każdy punkt energii mają znaczenie.
