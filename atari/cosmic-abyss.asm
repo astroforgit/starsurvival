@@ -4275,6 +4275,8 @@ amount_new_cost dta 2,1,2
 .proc draw_amount_modification_detail
         lda #70
         sta price_x
+        lda #0
+        sta price_x+1
         lda modal_y
         clc
         adc #10
@@ -4306,6 +4308,8 @@ amount_new_cost dta 2,1,2
 
         lda #132
         sta price_x
+        lda #0
+        sta price_x+1
         ldx modal_idx
         lda amount_new_gain,x
         ldy #11
@@ -5040,6 +5044,8 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         jsr text_at
         lda #124
         sta price_x
+        lda #0
+        sta price_x+1
         lda #134
         sta price_y
         lda #1
