@@ -206,7 +206,7 @@ function initEvents() {
 function startRandomEvent() {
   const safeSources = [0, 1, 2].filter(index => health[index] >= 2);
   eventRadioactiveOffer = false;
-  if (Math.random() < 0.5 && (safeSources.length || radioactive < 10)) {
+  if (Math.random() < 0.75 && (safeSources.length || radioactive < 10)) {
     eventType = "decision";
     eventMode = "trade";
     eventRadioactiveOffer = radioactive < 10 && (!safeSources.length || Math.random() < 1 / 3);
@@ -218,19 +218,19 @@ function startRandomEvent() {
       const destinations = [0, 1, 2].filter(index => index !== eventSource);
       eventDest = destinations[randomInt(destinations.length)];
     }
-    eventGain = 1 + randomInt(2);
+    eventGain = 2;
     eventDescription = TRADE_PROMPTS[randomInt(TRADE_PROMPTS.length)];
     eventWindow = 10;
   } else {
     eventType = "code";
     const modes = ["salvage", "hazard"];
-    if (radioactive < 10) modes.push("radioactiveLeak");
-    if (radioactive > 0) modes.push("clearRadioactiveLeak");
+    if (radioactive <= 8) modes.push("radioactiveLeak");
+    if (radioactive >= 2) modes.push("clearRadioactiveLeak");
     eventMode = modes[randomInt(modes.length)];
     eventDest = eventMode === "salvage" || eventMode === "hazard" ? randomInt(3) : RADIOACTIVE_ICON;
-    eventGain = 1 + randomInt(2);
-    if (eventMode === "radioactiveLeak") eventGain = Math.min(eventGain, 10 - radioactive);
-    if (eventMode === "clearRadioactiveLeak") eventGain = Math.min(eventGain, radioactive);
+    eventGain = eventMode === "radioactiveLeak" || eventMode === "clearRadioactiveLeak"
+      ? 2
+      : 1 + randomInt(2);
     eventCode = Array.from({ length: 4 }, () => randomInt(10));
     if (eventMode === "radioactiveLeak") eventDescription = "RADIOACTIVE LEAK";
     else if (eventMode === "clearRadioactiveLeak") eventDescription = "CLEAR RADIOACTIVE LEAK";

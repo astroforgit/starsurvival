@@ -4514,8 +4514,9 @@ event_tries     dta 0
         lda #0
         sta event_radio_offer
         jsr event_random
-        and #1
-        bne ?code
+        and #3
+        cmp #3                  ; three out of four events are robot trades
+        beq ?code
 
         ; Some robot offers grant a normal resource while adding one point of
         ; Radioactive as the cost instead of deducting a normal resource.
@@ -4562,11 +4563,8 @@ event_tries     dta 0
         beq ?dest
         sta event_dest
 ?trade_gain
-        jsr event_random
-        and #1
-        clc
-        adc #1
-        sta event_gain          ; trade one point for one or two elsewhere
+        lda #2
+        sta event_gain          ; trade one point for two elsewhere
         jsr event_random
         and #3
         sta event_trade_desc
@@ -4582,16 +4580,18 @@ event_tries     dta 0
         and #3
         cmp #2
         bne ?check_cleanup
-        ldx radioactive         ; a full meter cannot receive another leak
-        cpx #10
-        bne ?store_mode
-        lda #3
+        ldx radioactive         ; only offer a leak when all two points fit
+        cpx #9
+        bcc ?store_mode
+        lda #0                  ; otherwise fall back to salvage
+        jmp ?store_mode
 ?check_cleanup
         cmp #3
         bne ?store_mode
-        ldx radioactive         ; do not offer cleanup when radiation is zero
-        bne ?store_mode
-        lda #2
+        ldx radioactive         ; cleanup always removes exactly two points
+        cpx #2
+        bcs ?store_mode
+        lda #1                  ; otherwise fall back to a hazard
 ?store_mode
         sta event_mode
         cmp #2
@@ -4610,25 +4610,8 @@ event_tries     dta 0
 ?radioactive_target
         lda #7
         sta event_dest
-        jsr event_random
-        and #1
-        clc
-        adc #1
+        lda #2
         sta event_gain
-        lda event_mode
-        cmp #2
-        bne ?limit_cleanup
-        lda radioactive
-        cmp #9
-        bne ?radioactive_desc
-        lda #1                  ; only one point fits below the maximum
-        sta event_gain
-        jmp ?radioactive_desc
-?limit_cleanup
-        lda radioactive
-        cmp #1
-        bne ?radioactive_desc
-        sta event_gain          ; cleanup cannot remove more than is present
 ?radioactive_desc
         lda #0
         sta event_desc

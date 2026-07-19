@@ -151,7 +151,8 @@ Victory has its own spaceport-jump popup. Power, Life Support, and Processing
 failures each use a separate loss scenario and message.
 
 Random events appear in the narrow panel below the system table. Robot events
-offer a one-point resource exchange for one or two points of another resource.
+appear more frequently and offer a one-point resource exchange for two points of
+another resource.
 Timed salvage and hazard events show a random four-digit code; entering it
 within ten seconds collects the salvage or prevents the displayed resource loss.
 
@@ -178,10 +179,11 @@ VBXE VRAM `$039000` and draws each icon with one transparent blit.
 
 Radioactive is an inverse resource displayed directly below Processing. It starts
 at zero and has no keyboard action. A failed four-digit `RADIOACTIVE LEAK` event
-adds one or two points, while a successful `CLEAR RADIOACTIVE LEAK` event removes
-one or two points. Both events show their signed change beside the radioactive
-trefoil icon. Some robot offers also grant a normal resource in exchange for
-adding one Radioactive point; both effects are displayed before accepting.
+adds exactly two points, while a successful `CLEAR RADIOACTIVE LEAK` event removes
+exactly two points. These events only appear when the full change can be applied,
+and show their signed change beside the radioactive trefoil icon. Some robot
+offers also grant two points of a normal resource in exchange for adding one
+Radioactive point; both effects are displayed before accepting.
 
 The 320x200 console uses compact `STATUS`, `ACTION`, `LOAD`, and `MODS` columns.
 System rows show icons only; the full icon names are collected in a two-line
