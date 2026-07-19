@@ -56,7 +56,6 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const announcement = document.querySelector("#announcement");
 const titleScreen = document.querySelector("#title-screen");
 const titleArt = document.querySelector("#title-art");
-const cinematicComplete = new URLSearchParams(window.location.search).get("intro") === "complete";
 titleArt.src = titleImageUrl;
 ctx.imageSmoothingEnabled = false;
 
@@ -361,10 +360,6 @@ function updateEventControls() {
 
 function startGame() {
   if (!titleActive) return false;
-  if (!cinematicComplete) {
-    window.location.assign(new URL("../intro/", window.location.href));
-    return true;
-  }
   titleActive = false;
   briefingActive = true;
   briefingChars = 0;
@@ -1080,14 +1075,6 @@ function loop(now) {
   }
   if (!titleActive && !briefingActive) drawScreen();
   requestAnimationFrame(loop);
-}
-
-if (cinematicComplete) {
-  titleActive = false;
-  briefingActive = false;
-  titleScreen.classList.add("is-hidden");
-  window.history.replaceState({}, "", window.location.pathname);
-  gameInit();
 }
 
 requestAnimationFrame(loop);
