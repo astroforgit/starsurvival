@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 function directoryRoutes() {
   const redirect = (request, response, next) => {
     const [pathname, query] = (request.url || "").split("?", 2);
-    if (!["/intro", "/launch"].includes(pathname)) {
+    if (!["/intro", "/launch", "/game"].includes(pathname)) {
       next();
       return;
     }
@@ -29,7 +29,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        game: resolve(import.meta.dirname, "index.html"),
+        home: resolve(import.meta.dirname, "index.html"),
+        game: resolve(import.meta.dirname, "game/index.html"),
         intro: resolve(import.meta.dirname, "intro/index.html"),
         launch: resolve(import.meta.dirname, "launch/index.html")
       }

@@ -362,7 +362,7 @@ function updateEventControls() {
 function startGame() {
   if (!titleActive) return false;
   if (!cinematicComplete) {
-    window.location.assign(new URL("./intro/", window.location.href));
+    window.location.assign(new URL("../intro/", window.location.href));
     return true;
   }
   titleActive = false;

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cosmic Abyss - VBXE Web Edition</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <main class="console" aria-labelledby="game-title">
+    <h1 id="game-title" class="visually-hidden">Cosmic Abyss</h1>
+    <div class="screen-shell">
+      <canvas id="screen" width="320" height="200" tabindex="0"
+        aria-label="Cosmic Abyss systems console"></canvas>
+      <div class="scanlines" aria-hidden="true"></div>
+      <div id="title-screen" class="title-screen" aria-label="Cosmic Abyss title screen">
+        <img id="title-art" alt="A spacecraft engineer at a glowing control panel">
+        <div class="title-copy">
+          <span>PRESS SPACE TO START</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="controller" aria-label="Game controls">
+      <div class="dpad">
+        <button type="button" data-control="up" aria-label="Select previous system" title="Previous system">▲</button>
+        <button type="button" data-control="left" aria-label="Buy amount or automation modification" title="Amount / automation">◀</button>
+        <span aria-hidden="true"></span>
+        <button type="button" data-control="right" aria-label="Buy speed modification" title="Speed modification">▶</button>
+        <button type="button" data-control="down" aria-label="Select next system" title="Next system">▼</button>
+      </div>
+      <div class="mod-keys" aria-label="Modification shortcuts">
+        <button type="button" data-control="amount" aria-label="Install amount modification" title="Amount modification">A</button>
+        <button type="button" data-control="auto" aria-label="Install automation modification" title="Automation modification">U</button>
+        <button type="button" data-control="speed" aria-label="Install speed modification" title="Speed modification">D</button>
+      </div>
+      <div class="event-keys" aria-label="Random event controls">
+        <div class="decision-keys" hidden>
+          <button type="button" data-event-decision="yes" aria-label="Accept event">Y</button>
+          <button type="button" data-event-decision="no" aria-label="Reject event">N</button>
+        </div>
+        <div class="code-keys" hidden>
+          <button type="button" data-event-digit="1">1</button>
+          <button type="button" data-event-digit="2">2</button>
+          <button type="button" data-event-digit="3">3</button>
+          <button type="button" data-event-digit="4">4</button>
+          <button type="button" data-event-digit="5">5</button>
+          <button type="button" data-event-digit="6">6</button>
+          <button type="button" data-event-digit="7">7</button>
+          <button type="button" data-event-digit="8">8</button>
+          <button type="button" data-event-digit="9">9</button>
+          <button type="button" data-event-digit="0">0</button>
+        </div>
+      </div>
+      <button class="fire" type="button" data-control="fire" aria-label="Perform selected action" title="Fire / repair">FIRE</button>
+    </div>
+    <p id="announcement" class="visually-hidden" aria-live="polite"></p>
+  </main>
+  <script type="module" src="/src/game.js"></script>
+</body>
+</html>

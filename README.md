@@ -84,9 +84,10 @@ Pushing `main` deploys the web game and cinematic intro automatically through
 
 The deployed routes are:
 
-- Game: `https://astroforgit.github.io/starsurvival/`
-- Intro: `https://astroforgit.github.io/starsurvival/intro/`
+- Intro (starting page): `https://astroforgit.github.io/starsurvival/`
+- Intro (direct route): `https://astroforgit.github.io/starsurvival/intro/`
 - Operations briefing: `https://astroforgit.github.io/starsurvival/launch/`
+- Game: `https://astroforgit.github.io/starsurvival/game/`
 
 In the GitHub repository, select **Settings → Pages → Build and deployment →
 GitHub Actions** once to enable workflow-based publishing.
