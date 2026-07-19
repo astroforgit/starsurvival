@@ -1029,6 +1029,16 @@ auto_selected dta 0
 .endp
 
 .proc check_end
+        lda radioactive
+        cmp #10
+        bcc ?systems
+        lda #2
+        sta game_mode
+        lda #7
+        sta failure_system
+        jsr draw_end
+        rts
+?systems
         ldx #6
 ?loss   lda health,x
         beq ?lose
@@ -3913,6 +3923,12 @@ crt_noise_points
         ldy #C_TEXT
         jmp text_at
 ?lost   ldx failure_system
+        cpx #7
+        bne ?standard_failure
+        lda #<s_radioactive_fail
+        ldx #>s_radioactive_fail
+        jmp ?fail_title
+?standard_failure
         cpx #0
         bne ?life
         lda #<s_power_fail
@@ -3933,6 +3949,15 @@ crt_noise_points
         lda #84
         sta text_y
         lda failure_system
+        cmp #7
+        bne ?standard_failure_lines
+        lda #<s_radioactive_line1
+        ldx #>s_radioactive_line1
+        jsr ?line1
+        lda #<s_radioactive_line2
+        ldx #>s_radioactive_line2
+        jmp ?line2
+?standard_failure_lines
         cmp #0
         bne ?life_lines
         lda #<s_power_line1
@@ -4385,6 +4410,9 @@ s_life_line2 dta c'THE CREW DRIFTS TO SLEEP.',0
 s_processing_fail dta c'PROCESSING FAILURE',0
 s_process_line1 dta c'POWER CONTROL COLLAPSES.',0
 s_process_line2 dta c'FIRE CONSUMES THE SHIP.',0
+s_radioactive_fail dta c'RADIOACTIVE LEVEL CRITICAL',0
+s_radioactive_line1 dta c'NO LIFE DETECTED ONBOARD.',0
+s_radioactive_line2 dta c'THE ORPHEUS DRIFTS ON.',0
 s_denied   dta c'ACTION LOCKED, COOLING, OR TOO COSTLY',0
 s_won      dta c'ALL MAIN SYSTEMS ONLINE!',0
 s_lost     dta c'A SHIP SYSTEM WAS DESTROYED.',0

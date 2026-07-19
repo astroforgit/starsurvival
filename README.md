@@ -147,8 +147,8 @@ JumpDrive`, then `Install Source`. Each special replaces its normal system actio
 for a 20-second operation and opens a narrative popup on completion. Installing
 the source changes Generate Power to `+10` Power with no Processing cost.
 
-Victory has its own spaceport-jump popup. Power, Life Support, and Processing
-failures each use a separate loss scenario and message.
+Victory has its own spaceport-jump popup. Power, Life Support, Processing, and a
+fully radioactive meter each trigger a loss scenario and message.
 
 Random events appear in the narrow panel below the system table. Robot events
 appear more frequently and offer a one-point resource exchange for two points of
@@ -183,7 +183,8 @@ adds exactly two points, while a successful `CLEAR RADIOACTIVE LEAK` event remov
 exactly two points. These events only appear when the full change can be applied,
 and show their signed change beside the radioactive trefoil icon. Some robot
 offers also grant two points of a normal resource in exchange for adding one
-Radioactive point; both effects are displayed before accepting.
+Radioactive point; both effects are displayed before accepting. Reaching ten
+Radioactive points immediately ends the mission.
 
 The 320x200 console uses compact `STATUS`, `ACTION`, `LOAD`, and `MODS` columns.
 System rows show icons only; the full icon names are collected in a two-line

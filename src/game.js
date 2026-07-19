@@ -120,7 +120,8 @@ successImage.src = successImageUrl;
 const FAILURE_TEXT = {
   0: ["POWER SYSTEM FAILURE", "THE LIGHTS FAIL. AIR STALES.", "THE CREW FALLS SILENT."],
   1: ["LIFE SUPPORT FAILURE", "THE AIR TURNS STALE.", "THE CREW DRIFTS TO SLEEP."],
-  2: ["PROCESSING FAILURE", "POWER CONTROL COLLAPSES.", "FIRE CONSUMES THE SHIP."]
+  2: ["PROCESSING FAILURE", "POWER CONTROL COLLAPSES.", "FIRE CONSUMES THE SHIP."],
+  7: ["RADIOACTIVE LEVEL CRITICAL", "NO LIFE DETECTED ONBOARD.", "THE ORPHEUS DRIFTS ON."]
 };
 
 const BRIEFING_LINES = [
@@ -573,6 +574,11 @@ function tickGame(deltaSeconds) {
 }
 
 function checkEnd() {
+  if (radioactive >= 10) {
+    failureSystem = RADIOACTIVE_ICON;
+    gameMode = 2;
+    return;
+  }
   const failed = health.findIndex(value => value <= 0);
   if (failed >= 0) {
     failureSystem = failed;
