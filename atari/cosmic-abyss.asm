@@ -3933,15 +3933,39 @@ crt_noise_points
         bne ?life
         lda #<s_power_fail
         ldx #>s_power_fail
-        bne ?fail_title
+        jmp ?fail_title
 ?life   cpx #1
         bne ?processing
         lda #<s_life_fail
         ldx #>s_life_fail
-        bne ?fail_title
+        jmp ?fail_title
 ?processing
+        cpx #2
+        bne ?engineering
         lda #<s_processing_fail
         ldx #>s_processing_fail
+        jmp ?fail_title
+?engineering
+        cpx #3
+        bne ?guidance
+        lda #<s_engineering_fail
+        ldx #>s_engineering_fail
+        jmp ?fail_title
+?guidance
+        cpx #4
+        bne ?engines
+        lda #<s_guidance_fail
+        ldx #>s_guidance_fail
+        jmp ?fail_title
+?engines
+        cpx #5
+        bne ?sensors
+        lda #<s_engine_fail
+        ldx #>s_engine_fail
+        jmp ?fail_title
+?sensors
+        lda #<s_sensor_fail
+        ldx #>s_sensor_fail
 ?fail_title ldy #C_OFFLINE
         jsr text_at
         lda #48
@@ -3973,13 +3997,49 @@ crt_noise_points
         jsr ?line1
         lda #<s_life_line2
         ldx #>s_life_line2
-        bne ?line2
+        jmp ?line2
 ?process_lines
+        cmp #2
+        bne ?engineering_lines
         lda #<s_process_line1
         ldx #>s_process_line1
         jsr ?line1
         lda #<s_process_line2
         ldx #>s_process_line2
+        jmp ?line2
+?engineering_lines
+        cmp #3
+        bne ?guidance_lines
+        lda #<s_engineering_line1
+        ldx #>s_engineering_line1
+        jsr ?line1
+        lda #<s_engineering_line2
+        ldx #>s_engineering_line2
+        jmp ?line2
+?guidance_lines
+        cmp #4
+        bne ?engine_lines
+        lda #<s_guidance_line1
+        ldx #>s_guidance_line1
+        jsr ?line1
+        lda #<s_guidance_line2
+        ldx #>s_guidance_line2
+        jmp ?line2
+?engine_lines
+        cmp #5
+        bne ?sensor_lines
+        lda #<s_engine_line1
+        ldx #>s_engine_line1
+        jsr ?line1
+        lda #<s_engine_line2
+        ldx #>s_engine_line2
+        jmp ?line2
+?sensor_lines
+        lda #<s_sensor_line1
+        ldx #>s_sensor_line1
+        jsr ?line1
+        lda #<s_sensor_line2
+        ldx #>s_sensor_line2
 ?line2  ldy #C_TEXT
         jmp text_at
 ?line1  ldy #C_TEXT
@@ -4402,16 +4462,28 @@ s_win_line2 dta c'SPACEPORT IS READY. YOU WIN!',0
 s_success_line1 dta c'JUMP COURSE LOCKED.',0
 s_success_line2 dta c'THE CREW ESCAPES THE ABYSS.',0
 s_power_fail dta c'POWER SYSTEM FAILURE',0
-s_power_line1 dta c'THE LIGHTS FAIL. AIR STALES.',0
-s_power_line2 dta c'THE CREW FALLS SILENT.',0
+s_power_line1 dta c'THE REACTOR FALLS SILENT.',0
+s_power_line2 dta c'THE LAST LIGHT FADES OUT.',0
 s_life_fail dta c'LIFE SUPPORT FAILURE',0
-s_life_line1 dta c'THE AIR TURNS STALE.',0
-s_life_line2 dta c'THE CREW DRIFTS TO SLEEP.',0
-s_processing_fail dta c'PROCESSING FAILURE',0
-s_process_line1 dta c'POWER CONTROL COLLAPSES.',0
-s_process_line2 dta c'FIRE CONSUMES THE SHIP.',0
-s_radioactive_fail dta c'RADIOACTIVE LEVEL CRITICAL',0
-s_radioactive_line1 dta c'NO LIFE DETECTED ONBOARD.',0
+s_life_line1 dta c'OXYGEN FALLS BELOW SURVIVAL.',0
+s_life_line2 dta c'NO HEARTBEATS REMAIN.',0
+s_processing_fail dta c'PROCESSING CORE FAILURE',0
+s_process_line1 dta c'SHIP CONTROL LOOPS COLLAPSE.',0
+s_process_line2 dta c'THE CORE BURNS IN SILENCE.',0
+s_engineering_fail dta c'ENGINEERING SYSTEM FAILURE',0
+s_engineering_line1 dta c'THE HULL CANNOT BE STABILIZED.',0
+s_engineering_line2 dta c'THE SHIP BREAKS APART.',0
+s_guidance_fail dta c'GUIDANCE SYSTEM FAILURE',0
+s_guidance_line1 dta c'THE ORPHEUS LOSES ITS COURSE.',0
+s_guidance_line2 dta c'THE ABYSS HAS NO HORIZON.',0
+s_engine_fail dta c'ENGINE SYSTEM FAILURE',0
+s_engine_line1 dta c'THE JUMP DRIVE FALLS SILENT.',0
+s_engine_line2 dta c'THE SHIP DRIFTS FOREVER.',0
+s_sensor_fail dta c'SENSOR SYSTEM FAILURE',0
+s_sensor_line1 dta c'THE DARKNESS BECOMES ABSOLUTE.',0
+s_sensor_line2 dta c'NOTHING ANSWERS THE VOID.',0
+s_radioactive_fail dta c'RADIATION LEVEL CRITICAL',0
+s_radioactive_line1 dta c'NO LIFE SIGNS DETECTED.',0
 s_radioactive_line2 dta c'THE ORPHEUS DRIFTS ON.',0
 s_denied   dta c'ACTION LOCKED, COOLING, OR TOO COSTLY',0
 s_won      dta c'ALL MAIN SYSTEMS ONLINE!',0

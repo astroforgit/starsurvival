@@ -147,8 +147,8 @@ JumpDrive`, then `Install Source`. Each special replaces its normal system actio
 for a 20-second operation and opens a narrative popup on completion. Installing
 the source changes Generate Power to `+10` Power with no Processing cost.
 
-Victory has its own spaceport-jump popup. Power, Life Support, Processing, and a
-fully radioactive meter each trigger a loss scenario and message.
+Victory has its own spaceport-jump popup. Every failed system has its own loss
+message, while a fully radioactive meter triggers a critical-radiation ending.
 
 Random events appear in the narrow panel below the system table. Robot events
 appear more frequently and offer a one-point resource exchange for two points of
