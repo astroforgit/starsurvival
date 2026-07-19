@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
@@ -24,8 +25,21 @@ function directoryRoutes() {
   };
 }
 
+function atariDownload() {
+  return {
+    name: "cosmic-abyss-atari-download",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "cosmic-abyss.xex",
+        source: readFileSync(resolve(import.meta.dirname, "atari/cosmic-abyss.xex"))
+      });
+    }
+  };
+}
+
 export default defineConfig({
-  plugins: [directoryRoutes()],
+  plugins: [directoryRoutes(), atariDownload()],
   build: {
     rollupOptions: {
       input: {
