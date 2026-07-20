@@ -1,9 +1,9 @@
 "use strict";
 
-import titleImageUrl from "../pic/girl1.png";
-import powerFailureImageUrl from "../pic/gameover-power-web.png";
-import repairImageUrl from "../pic/repair-web.png";
-import successImageUrl from "../pic/success-web.png";
+const titleImageUrl = new URL("../pic/girl1.png", import.meta.url).href;
+const powerFailureImageUrl = new URL("../pic/gameover-power-web.png", import.meta.url).href;
+const repairImageUrl = new URL("../pic/repair-web.png", import.meta.url).href;
+const successImageUrl = new URL("../pic/success-web.png", import.meta.url).href;
 
 // Browser equivalents of the Atari data tables. Keep ordering synchronized
 // with health/cooldown/unlocked/clicks in atari/cosmic-abyss.asm.
