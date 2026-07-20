@@ -100,14 +100,16 @@ an event is active.
 
 ## Atari build
 
-Requires MADS and a VBXE-equipped Atari or compatible emulator.
-
 ```sh
+npm run build:artwork
 npm run build:atari
 ```
 
-The command assembles `atari/cosmic-abyss.asm` into
-`atari/cosmic-abyss.xex`.
+The artwork step recreates the face-preserving four-level title conversion and
+the split repair-screen data used to avoid the VBXE CPU window. It requires
+Python and Pillow. The Atari step requires MADS and assembles
+`atari/cosmic-abyss.asm` into `atari/cosmic-abyss.xex` for a VBXE-equipped Atari
+or compatible emulator.
 
 Atari controls:
 
@@ -151,6 +153,10 @@ Timed salvage and hazard events show a random four-digit code; entering it
 within ten seconds collects the salvage or prevents the displayed resource loss.
 
 ## VBXE implementation
+
+The Atari XEX detects an FX core at either `$D640` or `$D740` and relocates its
+VBXE register accesses at startup, so one binary supports both standard I/O
+address configurations.
 
 The Atari version disables ANTIC and uses a 320x200 VBXE overlay with one byte
 per pixel. The framebuffer begins at VRAM `$000000`; the XDL and blitter control

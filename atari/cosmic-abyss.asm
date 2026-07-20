@@ -47,6 +47,9 @@ DMACTL   = $D400
 VCOUNT   = $D40B
 
 ; ---- VBXE ----
+; These addresses are assembled for the $D6 register page. detect_vbxe patches
+; the high byte of every runtime access to $D7 when that is where the core is
+; found, allowing the same XEX to run with either standard VBXE mapping.
 VBXE_VCTL       = $D640
 VBXE_XDL0       = $D641
 VBXE_XDL1       = $D642
@@ -146,6 +149,9 @@ txt_ptr = $D7                   ; 2 - draw_text's string
 ; main
 ;=============================================================================
 .proc main
+        lda PORTB
+        ora #2                  ; expose RAM under BASIC before VBXE relocation;
+        sta PORTB               ; two patched drawing instructions live there
         jsr detect_vbxe
         bcs ?ok
         lda #$34                ; no VBXE -> red border, park
@@ -154,12 +160,11 @@ txt_ptr = $D7                   ; 2 - draw_text's string
 ?ok     lda #0
         sta SDMCTL              ; ANTIC playfield off. Setting the SHADOW is what
         sta DMACTL              ;   makes it stick: the OS VBI reloads DMACTL from it.
-        lda PORTB
-        ora #2                  ; shower artwork is loaded into RAM at $A000
-        sta PORTB
         lda #$90+MC_CPU         ; MEMAC-A: map a 4K VRAM window at $9000, CPU side
+vbreg_main_memac
         sta VBXE_MEMAC_CTRL
         lda #0
+vbreg_main_vctl
         sta VBXE_VCTL
         jsr setup_xdl
         jsr blit_init
@@ -1074,23 +1079,78 @@ auto_selected dta 0
 ;=============================================================================
 ; VBXE bring-up
 ;=============================================================================
-.proc detect_vbxe               ; C=1 if a VBXE answers at either core address
+.proc detect_vbxe               ; C=1 if an FX core answers at either address
         lda VBXE_VCTL
         cmp #$10
-        beq ?yes
+        beq ?d6
         lda $D740
         cmp #$10
-        beq ?yes
+        beq ?d7
         clc
         rts
-?yes    sec
+?d6     lda #$D6
+        bne ?found
+?d7     lda #$D7
+?found  jsr relocate_vbxe_registers
+        sec
         rts
 .endp
+
+; Rewrite the high byte of all absolute VBXE register operands. The relocation
+; list contains addresses of operand high bytes (instruction label + 2).
+.proc relocate_vbxe_registers
+        sta ?page+1
+        lda #<vbxe_relocations
+        sta srcp
+        lda #>vbxe_relocations
+        sta srcp+1
+        ldy #0
+?next   lda (srcp),y
+        sta dstp
+        iny
+        lda (srcp),y
+        sta dstp+1
+        iny
+?page   lda #$D6
+        ldx #0
+        sta (dstp,x)
+        cpy #vbxe_relocations_end-vbxe_relocations
+        bne ?next
+        rts
+.endp
+
+vbxe_relocations
+        dta a(main.vbreg_main_memac+2),a(main.vbreg_main_vctl+2)
+        dta a(setup_xdl.vbreg_setup_xdl_bank+2)
+        dta a(enable_display.vbreg_enable_vctl+2),a(enable_display.vbreg_enable_xdl0+2)
+        dta a(enable_display.vbreg_enable_xdl1+2),a(enable_display.vbreg_enable_xdl2+2)
+        dta a(load_pal.vbreg_palette_psel+2),a(load_pal.vbreg_palette_csel+2)
+        dta a(load_pal.vbreg_palette_cr+2),a(load_pal.vbreg_palette_cg+2)
+        dta a(load_pal.vbreg_palette_cb+2)
+        dta a(font_expand.vbreg_font_bank_on+2),a(font_expand.vbreg_font_bank_off+2)
+        dta a(icons_expand.vbreg_icons_bank_on+2),a(icons_expand.vbreg_icons_bank_off+2)
+        dta a(blit_init.vbreg_blit_addr0+2),a(blit_init.vbreg_blit_addr1+2)
+        dta a(blit_init.vbreg_blit_addr2+2),a(wait_blit.vbreg_wait_blitter+2)
+        dta a(do_blit.vbreg_do_blit_bank+2),a(do_blit.vbreg_do_blit_start+2)
+        dta a(title_put_pixel.vbreg_title_pixel_bank+2)
+        dta a(advance_failure_row.vbreg_failure_row_bank+2)
+        dta a(draw_failure_bitmap.vbreg_failure_bank_on+2)
+        dta a(draw_failure_bitmap.vbreg_failure_bank_off+2)
+        dta a(draw_success_bitmap.vbreg_success_bank_on+2)
+        dta a(draw_success_bitmap.vbreg_success_bank_off+2)
+        dta a(draw_title_screen.vbreg_title_bank_on+2)
+        dta a(draw_title_screen.vbreg_title_bank_off+2)
+        dta a(draw_briefing_screen.vbreg_briefing_bank_on+2)
+        dta a(draw_briefing_screen.vbreg_briefing_bank_off+2)
+        dta a(draw_relax_bitmap.vbreg_relax_bank_on+2)
+        dta a(draw_relax_bitmap.vbreg_relax_bank_off+2)
+vbxe_relocations_end
 
 ; The XDL (VBXE's own display list): 8 overscan lines, then 200 active lines of a
 ; linear 320-byte-stride overlay reading VRAM $000000 through palette #1.
 .proc setup_xdl
         lda #BANK_EN+BANK_XDL
+vbreg_setup_xdl_bank
         sta VBXE_BANK_SEL
         ldx #xdl_len-1
 ?l      lda xdl_data,x
@@ -1114,12 +1174,16 @@ xdl_len = * - xdl_data
 
 .proc enable_display
         lda #VC_XDL_ON+VC_XCOLOR
+vbreg_enable_vctl
         sta VBXE_VCTL
         lda #$00                ; XDL at $07F000
+vbreg_enable_xdl0
         sta VBXE_XDL0
         lda #$F0
+vbreg_enable_xdl1
         sta VBXE_XDL1
         lda #$07
+vbreg_enable_xdl2
         sta VBXE_XDL2
         rts
 .endp
@@ -1129,17 +1193,22 @@ xdl_len = * - xdl_data
 ;   because the table is sparse.
 .proc load_pal
         lda #1
+vbreg_palette_psel
         sta VBXE_PSEL
         ldx #0
 ?l      lda pal_tab,x
         cmp #$FF
         beq ?done
+vbreg_palette_csel
         sta VBXE_CSEL
         lda pal_tab+1,x
+vbreg_palette_cr
         sta VBXE_CR
         lda pal_tab+2,x
+vbreg_palette_cg
         sta VBXE_CG
         lda pal_tab+3,x
+vbreg_palette_cb
         sta VBXE_CB
         txa
         clc
@@ -1210,6 +1279,7 @@ bits    dta 0
 
 .proc font_expand
         lda #BANK_EN+FONT_BANK
+vbreg_font_bank_on
         sta VBXE_BANK_SEL
         lda #<terminal_font
         sta srcp
@@ -1258,6 +1328,7 @@ bits    dta 0
         cpx #64
         bne ?glyph
         lda #0
+vbreg_font_bank_off
         sta VBXE_BANK_SEL
         rts
 ?sy     dta 0
@@ -1349,6 +1420,7 @@ icon_cols_left dta 0
 
 .proc icons_expand
         lda #BANK_EN+ICON_BANK
+vbreg_icons_bank_on
         sta VBXE_BANK_SEL
         lda #<icon_bits
         sta srcp
@@ -1391,6 +1463,7 @@ icon_cols_left dta 0
         cmp #8
         bne ?icon
         lda #0
+vbreg_icons_bank_off
         sta VBXE_BANK_SEL
         rts
 .endp
@@ -1413,16 +1486,21 @@ bl_mode dta 0                   ; 0 = opaque, 1 = transparent (source 0 = leave 
 
 .proc blit_init                 ; point the blitter at the BCB once; it never moves
         lda #<BCB_OFF
+vbreg_blit_addr0
         sta VBXE_BL_ADR0
         lda #$F1
+vbreg_blit_addr1
         sta VBXE_BL_ADR1
         lda #$07
+vbreg_blit_addr2
         sta VBXE_BL_ADR2
         rts
 .endp
 
 .proc wait_blit
-?w      lda VBXE_BLITTER
+?w
+vbreg_wait_blitter
+        lda VBXE_BLITTER
         bne ?w
         rts
 .endp
@@ -1430,6 +1508,7 @@ bl_mode dta 0                   ; 0 = opaque, 1 = transparent (source 0 = leave 
 .proc do_blit
         jsr wait_blit
         lda #BANK_EN+BANK_XDL
+vbreg_do_blit_bank
         sta VBXE_BANK_SEL
         lda bl_src
         sta MEMW+BCB_OFF+0
@@ -1472,6 +1551,7 @@ bl_mode dta 0                   ; 0 = opaque, 1 = transparent (source 0 = leave 
         lda bl_mode
         sta MEMW+BCB_OFF+20
         lda #1
+vbreg_do_blit_start
         sta VBXE_BLITTER        ; go
         rts
 .endp
@@ -1967,6 +2047,7 @@ title_next_src dta a(0)
         inc title_bank
         lda title_bank
         ora #BANK_EN
+vbreg_title_pixel_bank
         sta VBXE_BANK_SEL
 ?done   rts
 .endp
@@ -2119,6 +2200,7 @@ brief_palette dta 34,39,44,47
         inc title_bank
         lda title_bank
         ora #BANK_EN
+vbreg_failure_row_bank
         sta VBXE_BANK_SEL
 ?done   rts
 .endp
@@ -2128,6 +2210,7 @@ brief_palette dta 34,39,44,47
         lda #0
         sta title_bank
         lda #BANK_EN
+vbreg_failure_bank_on
         sta VBXE_BANK_SEL
         lda #<$915C             ; framebuffer (28, 1)
         sta dstp
@@ -2158,6 +2241,7 @@ brief_palette dta 34,39,44,47
         dec title_rows
         bne ?row
         lda #0
+vbreg_failure_bank_off
         sta VBXE_BANK_SEL
         rts
 .endp
@@ -2167,6 +2251,7 @@ brief_palette dta 34,39,44,47
         lda #0
         sta title_bank
         lda #BANK_EN
+vbreg_success_bank_on
         sta VBXE_BANK_SEL
         lda #<$915C             ; framebuffer (28, 1)
         sta dstp
@@ -2197,6 +2282,7 @@ brief_palette dta 34,39,44,47
         dec title_rows
         bne ?row
         lda #0
+vbreg_success_bank_off
         sta VBXE_BANK_SEL
         rts
 .endp
@@ -2259,6 +2345,7 @@ brief_palette dta 34,39,44,47
         lda #0
         sta title_bank
         lda #BANK_EN
+vbreg_title_bank_on
         sta VBXE_BANK_SEL
         lda #<title_bitmap
         sta srcp
@@ -2291,6 +2378,7 @@ brief_palette dta 34,39,44,47
         dec title_rows
         bne ?row
         lda #0
+vbreg_title_bank_off
         sta VBXE_BANK_SEL
 
         lda #68
@@ -2461,6 +2549,7 @@ brief_skipped dta 0
         lda #0
         sta title_bank
         lda #BANK_EN
+vbreg_briefing_bank_on
         sta VBXE_BANK_SEL
         lda #<briefing_bitmap
         sta srcp
@@ -2491,8 +2580,17 @@ brief_skipped dta 0
         lda title_next_src+1
         sta srcp+1
         dec title_rows
+        lda title_rows
+        cmp #25                 ; final 25 source rows live above BASIC, away
+        bne ?more               ; from the $9000-$9FFF VBXE CPU window
+        lda #<briefing_bitmap_tail
+        sta srcp
+        lda #>briefing_bitmap_tail
+        sta srcp+1
+?more   lda title_rows
         bne ?row
         lda #0
+vbreg_briefing_bank_off
         sta VBXE_BANK_SEL
 
         lda #88
@@ -4513,9 +4611,9 @@ title_bitmap
         ins 'atari/title-screen.2bpp'
 
 briefing_bitmap
-        ; pic/repair.png cropped to 8:5, scaled to 160x100, and packed 2bpp.
-        ; It expands 2x at runtime to fill the 320x200 VBXE framebuffer.
-        ins 'atari/repair-screen.2bpp'
+        ; First 75 rows of the 160x100 repair image. Keeping this block below
+        ; $9000 prevents MEMAC-A from hiding it while it is being drawn.
+        ins 'atari/repair-screen-top.2bpp'
 
         org $A000
 shower_bitmap
@@ -5330,6 +5428,7 @@ s_event_missed    dta c'SALVAGE MISSED',0
         lda #0
         sta title_bank
         lda #BANK_EN
+vbreg_relax_bank_on
         sta VBXE_BANK_SEL
         lda #<shower_bitmap
         sta srcp
@@ -5362,6 +5461,7 @@ s_event_missed    dta c'SALVAGE MISSED',0
         dec title_rows
         bne ?row
         lda #0
+vbreg_relax_bank_off
         sta VBXE_BANK_SEL
         rts
 .endp
@@ -5496,5 +5596,10 @@ relax_type_skip dta 0
 .endp
 
 s_relax_continue dta c'PRESS SPACE TO CONTINUE',0
+
+        org $BC00
+briefing_bitmap_tail
+        ; Final 25 repair rows, stored in RAM exposed beneath BASIC ROM.
+        ins 'atari/repair-screen-tail.2bpp'
 
         run main

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "build:artwork": "python3 atari/tools/convert_artwork.py",
     "build:atari": "mads atari/cosmic-abyss.asm -o:atari/cosmic-abyss.xex"
   },
   "devDependencies": {
