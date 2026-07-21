@@ -93,7 +93,7 @@ In the GitHub repository, select **Settings → Pages → Build and deployment �
 GitHub Actions** once to enable workflow-based publishing.
 
 Direct action keys are `P` Power, `L` Life Support, `O` Processing, `E`
-Engineering, `G` Guidance, `N` Engines, and `S` Sensors. Modifications use `A`
+Engineering, `G` Guidance, `I` Engines, and `S` Sensors. Modifications use `A`
 Amount, `U` Auto, and `D` Speed. Random events reserve `Y/N` for decisions and
 the number keys for four-digit challenges; matching touch buttons appear while
 an event is active.
@@ -114,7 +114,7 @@ or compatible emulator.
 Atari controls:
 
 - Space during the opening briefing skips directly to the game
-- keyboard `P/L/O/E/G/N/S` performs the corresponding action directly
+- keyboard `P/L/O/E/G/I/S` performs the corresponding action directly
 - keyboard `A/U/D` purchases Amount, Auto, or Speed directly
 - keyboard `Y/N` accepts or rejects a random robot trade
 - number keys enter the displayed four-digit emergency code

@@ -231,9 +231,9 @@ gain_tab dta 2,1,3,2,2,3,2
 base_gain dta 2,1,3,2,2,3,2
 cost_pwr dta 0,1,1,2,1,3,1
 cost_lif dta 0,0,0,0,0,1,0
-cost_prc dta 1,0,0,2,0,1,1
+cost_prc dta 1,0,0,2,0,0,1
 base_cost_pwr dta 0,1,1,2,1,3,1
-base_cost_prc dta 1,0,0,2,0,1,1
+base_cost_prc dta 1,0,0,2,0,0,1
 bit_tab  dta 1,2,4,8,16,32,64
 
 names_lo dta <s_power,<s_life,<s_process,<s_engineer,<s_guidance,<s_engines,<s_sensors
@@ -348,7 +348,7 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
 .endp
 initial_health dta 2,7,9,2,2,1,3
 
-; Direct action keys: P/L/O/E/G/N/S. Modification keys: A/U/D.
+; Direct action keys: P/L/O/E/G/I/S. Modification keys: A/U/D.
 ; Values are Atari OS CH scan codes (unshifted letters).
 .proc read_keyboard
         jsr read_event_keyboard
@@ -371,7 +371,7 @@ initial_health dta 2,7,9,2,2,1,3
         beq ?engineering
         cmp #$3D                ; G - Guidance
         beq ?guidance
-        cmp #$23                ; N - Engines
+        cmp #$0D                ; I - Engines (N is reserved for rejecting offers)
         beq ?engines
         cmp #$3E                ; S - Sensors
         beq ?sensors
@@ -885,6 +885,7 @@ mod_check_mask dta 0
         jsr tick_cooldowns
         jsr tick_specials
         jsr run_auto_actions
+        jsr tick_event_result
         jsr draw_progress
         inc frame50
         lda frame50
@@ -1402,8 +1403,9 @@ terminal_font
         dta $10,$28,$44,$00,$00,$00,$00,$00 ; ^
         dta $00,$00,$00,$00,$00,$00,$7C,$00 ; _
 
-; Eight custom 8x8 icons, shared pixel-for-pixel with src/game.js. They are
-; expanded once into coloured VBXE sprites; zero remains transparent.
+; Eight custom 8x8 icons. The first seven are shared pixel-for-pixel with
+; src/game.js; the Atari radioactive icon uses the inverted trefoil only.
+; They are expanded once into coloured VBXE sprites; zero remains transparent.
 icon_bits
         dta $18,$18,$30,$7C,$18,$30,$20,$00 ; power: bolt
         dta $66,$FF,$FF,$7E,$3C,$18,$00,$00 ; life support: heart
@@ -1412,7 +1414,7 @@ icon_bits
         dta $18,$7E,$DB,$FF,$BD,$7E,$42,$00 ; guidance: robot
         dta $18,$3C,$7E,$5A,$5A,$3C,$66,$00 ; engines: rocket
         dta $06,$0C,$58,$30,$30,$7E,$18,$00 ; sensors: dish
-        dta $3C,$7E,$A5,$99,$DB,$E7,$66,$3C ; radioactive: circular radiation trefoil
+        dta $66,$E7,$C3,$00,$18,$00,$3C,$18 ; radioactive: circle-free yellow trefoil
 icon_cols dta 18,19,20,21,22,23,24,25
 icon_idx  dta 0
 icon_rows dta 0
@@ -2810,7 +2812,9 @@ vbreg_briefing_bank_off
         jmp text_at
 .endp
 
-row_y_tab dta 18,32,46,74,88,102,116
+; Resource rows stay compact. Leave a clear separator after the standalone
+; Radioactive row, then shift all four main-system rows down together.
+row_y_tab dta 18,32,46,80,94,108,122
 
 ; Fractional width tables avoid division in the frame loop. A normal cooldown
 ; advances through eight pixels per second; the speed upgrade uses sixteen.
@@ -3282,7 +3286,7 @@ lm_idx dta 0
 ?type   dta 0
 .endp
 
-action_key_glyph dta 48,44,47,37,39,46,51 ; P,L,O,E,G,N,S (ASCII-32)
+action_key_glyph dta 48,44,47,37,39,41,51 ; P,L,O,E,G,I,S (ASCII-32)
 resource_key_glyph dta 48,44,47             ; P,L,O
 .proc draw_special_name        ; X=main system
         stx ?system
@@ -3329,7 +3333,7 @@ resource_key_glyph dta 48,44,47             ; P,L,O
         sta fr_w
         lda #300/256
         sta fr_w+1
-        lda #114
+        lda #120               ; include the lowered Sensors row and progress bar
         sta fr_h
         lda #C_WIN
         sta fr_col
@@ -3647,13 +3651,13 @@ tiny_colour dta C_TEXT
         lda #0
         sta calc_x+1
         sta text_x+1
-        lda #148
+        lda #170               ; event panel owns 145..168; clear only legends
         sta calc_y
         lda #296&255
         sta fr_w
         lda #296/256
         sta fr_w+1
-        lda #47
+        lda #25                ; legend area through scanline 194
         sta fr_h
         lda #C_WIN
         sta fr_col
@@ -3662,7 +3666,7 @@ tiny_colour dta C_TEXT
         sta tiny_x
         lda #0
         sta tiny_x+1
-        lda #173
+        lda #175               ; compact two-line footer legend
         sta tiny_y
         lda #<s_power
         ldx #>s_power
@@ -3690,7 +3694,7 @@ tiny_colour dta C_TEXT
         sta tiny_x
         lda #0
         sta tiny_x+1             ; clear carry from the long RADIOACTIVE label
-        lda #187
+        lda #189               ; separated from resources and above the bottom frame
         sta tiny_y
         lda #<s_engineer
         ldx #>s_engineer
@@ -4634,6 +4638,7 @@ event_type      dta 0
 event_mode      dta 0
 event_next_sec  dta 0
 event_window    dta 0
+event_result_frames dta 0       ; fixed short result flash, independent of seconds
 event_source    dta 0
 event_dest      dta 0
 event_gain      dta 0
@@ -4701,6 +4706,7 @@ event_tries     dta 0
         sta event_mode
         sta event_window
         sta event_entered
+        sta event_result_frames
         jsr schedule_next_event
         rts
 .endp
@@ -4837,11 +4843,14 @@ event_tries     dta 0
         bne ?trade_running
         lda #4                  ; unanswered trade is rejected
         sta event_type
-        lda #1
-        sta event_window
+        lda #20
+        sta event_result_frames
         jmp draw_event_panel
 ?trade_running
-        jmp draw_event_panel
+        ; The description, category label, and frame are static for the whole
+        ; offer. Refreshing the complete panel every second made them flash;
+        ; only the countdown strip changes while the offer is active.
+        jmp draw_event_progress
 ?check_code
         cmp #2
         bne ?result
@@ -4849,18 +4858,14 @@ event_tries     dta 0
         bne ?code_running
         jmp event_code_failed
 ?code_running
-        jmp draw_event_panel
+        ; Keep the challenge contents stable and update only its countdown.
+        jmp draw_event_progress
 ?result
-        dec event_window
-        bne ?draw
-        lda #0
-        sta event_type
-        jsr schedule_next_event
-?draw   jmp draw_event_panel
+        rts                     ; frame-based tick_event_result owns result timing
 ?waiting
         dec event_next_sec
         beq ?start
-        jmp draw_event_panel
+        rts                     ; the idle panel is already clear
 ?start
         jmp start_random_event
 ?done   rts
@@ -4913,8 +4918,8 @@ digit_scan_codes
         sta CH
         lda #4
         sta event_type
-        lda #1                  ; rapid test mode: one-second result flash
-        sta event_window
+        lda #20                 ; show result and category together for 0.4 seconds
+        sta event_result_frames
         jsr draw_event_panel
         sec
         rts
@@ -4993,8 +4998,8 @@ digit_scan_codes
         jsr add_event_resource
         lda #3
         sta event_type
-        lda #1                  ; rapid test mode: one-second result flash
-        sta event_window
+        lda #20
+        sta event_result_frames
         jmp redraw_after_event
 .endp
 
@@ -5021,8 +5026,8 @@ digit_scan_codes
 ?prevented
         lda #3
         sta event_type
-        lda #1                  ; rapid test mode: one-second result flash
-        sta event_window
+        lda #20
+        sta event_result_frames
         jmp redraw_after_event
 .endp
 
@@ -5050,9 +5055,28 @@ digit_scan_codes
         sta radioactive
 ?missed lda #5
         sta event_type
-        lda #1                  ; rapid test mode: one-second result flash
-        sta event_window
+        lda #20
+        sta event_result_frames
         jmp redraw_after_event
+.endp
+
+; Result text and its OPPORTUNITY/CHALLENGE label must clear on the same frame.
+; A frame counter also avoids the old 0..1 second lifetime caused by alignment
+; with the once-per-second event tick.
+.proc tick_event_result
+        lda event_type
+        cmp #3
+        bcc ?done
+        lda event_result_frames
+        beq ?clear
+        dec event_result_frames
+        bne ?done
+?clear  lda #0
+        sta event_type
+        sta event_window
+        jsr schedule_next_event
+        jmp draw_event_panel
+?done   rts
 .endp
 
 .proc draw_event_digits        ; four target digits at the current text cursor
@@ -5084,7 +5108,7 @@ event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
         sta calc_x
         lda #0
         sta calc_x+1
-        lda #143
+        lda #165
         sta calc_y
         lda #<276
         sta fr_w
@@ -5113,7 +5137,7 @@ event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
         sta price_x
         lda #0
         sta price_x+1
-        lda #134
+        lda #157
         sta price_y
         lda event_mode
         cmp #2
@@ -5154,13 +5178,13 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta calc_x
         lda #0
         sta calc_x+1
-        lda #131
+        lda #145               ; clear the panel and the small label above it
         sta calc_y
         lda #296&255
         sta fr_w
         lda #296/256
         sta fr_w+1
-        lda #17
+        lda #24
         sta fr_h
         lda #C_WIN
         sta fr_col
@@ -5172,30 +5196,56 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
 ?active
         lda #12
         sta calc_x
-        lda #131
+        lda #151
         sta calc_y
         lda #296&255
         sta fr_w
         lda #296/256
         sta fr_w+1
-        lda #16
+        lda #18
         sta fr_h
         lda #C_BORDER
         sta fr_col
         jsr fill_round_rect
         lda #14
         sta calc_x
-        lda #133
+        lda #153
         sta calc_y
         lda #292&255
         sta fr_w
         lda #292/256
         sta fr_w+1
-        lda #12
+        lda #14
         sta fr_h
         lda #C_WIN
         sta fr_col
         jsr fill_round_rect
+
+        ; Label the event category above the upper-left edge using the same
+        ; compact 3x5 font as the footer legend.
+        lda #20
+        sta tiny_x
+        lda #0
+        sta tiny_x+1
+        lda #146
+        sta tiny_y
+        lda event_type
+        cmp #1
+        beq ?opportunity_label
+        cmp #2
+        beq ?challenge_label
+        lda event_mode           ; completed robot trades remain opportunities
+        cmp #4
+        beq ?opportunity_label
+?challenge_label
+        lda #<s_event_challenge
+        ldx #>s_event_challenge
+        bne ?draw_category
+?opportunity_label
+        lda #<s_trade_opportunity
+        ldx #>s_trade_opportunity
+?draw_category
+        jsr draw_tiny_text
 
         lda event_type
         cmp #1
@@ -5209,7 +5259,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta text_x
         lda #0
         sta text_x+1
-        lda #134
+        lda #157
         sta text_y
         ldx event_trade_desc
         lda trade_desc_lo,x
@@ -5224,7 +5274,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta price_x
         lda #0
         sta price_x+1
-        lda #134
+        lda #157
         sta price_y
         lda #1
         ldx event_source
@@ -5244,7 +5294,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta text_x
         lda #0
         sta text_x+1
-        lda #134
+        lda #157
         sta text_y
         lda #<s_event_yes_no
         ldx #>s_event_yes_no
@@ -5256,7 +5306,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta text_x
         lda #0
         sta text_x+1
-        lda #134
+        lda #157
         sta text_y
         ldx event_desc
         lda event_mode
@@ -5303,7 +5353,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta text_x
         lda #0
         sta text_x+1
-        lda #134
+        lda #157
         sta text_y
         lda event_type
         cmp #4
@@ -5380,7 +5430,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
         sta price_x
         lda #0
         sta price_x+1
-        lda #134
+        lda #157
         sta price_y
         lda #1
         ldx #7
@@ -5398,6 +5448,7 @@ trade_desc_hi dta >s_trade_opportunity,>s_trade_want,>s_trade_option,>s_trade_of
 .endp
 
 s_trade_opportunity dta c'OPPORTUNITY',0
+s_event_challenge  dta c'CHALLENGE',0
 s_trade_want      dta c'DO YOU WANT',0
 s_trade_option    dta c'HAVE OPTION',0
 s_trade_offer     dta c'ROBOT OFFER',0

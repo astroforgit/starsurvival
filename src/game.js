@@ -13,16 +13,18 @@ const INITIAL_HEALTH = [2, 7, 9, 2, 2, 1, 3];
 const BASE_GAIN = [2, 1, 3, 2, 2, 3, 2];
 const COST_PWR = [0, 1, 1, 2, 1, 3, 1];
 const COST_LIF = [0, 0, 0, 0, 0, 1, 0];
-const COST_PRC = [1, 0, 0, 2, 0, 1, 1];
+const COST_PRC = [1, 0, 0, 2, 0, 0, 1];
 const NAMES = ["POWER", "LIFE SUPPORT", "PROCESSING", "ENGINEERING", "GUIDANCE", "ENGINES", "SENSORS"];
-const ACTION_KEYS = ["P", "L", "O", "E", "G", "N", "S"];
+const ACTION_KEYS = ["P", "L", "O", "E", "G", "I", "S"];
 const EVENT_TEST_MODE = true;
 const TRADE_PROMPTS = ["OPPORTUNITY", "DO YOU WANT", "HAVE OPTION", "ROBOT OFFER"];
 const SALVAGE_DESCRIPTIONS = ["ALPHA MACHINE", "HELP RESEARCH", "REPAIR DRONE", "RESTORE RELAY"];
 const HAZARD_DESCRIPTIONS = ["COOLANT LEAK", "RESEARCH FIRE", "POWER SURGE", "CORE FAILURE"];
 const RADIOACTIVE_ICON = 7;
 const RADIOACTIVE_ROW_Y = 60;
-const ROW_Y = [18, 32, 46, 74, 88, 102, 116];
+// Match the Atari layout: resources stay compact, Radioactive occupies the
+// separator, and every main-system row is shifted down together.
+const ROW_Y = [18, 32, 46, 80, 94, 108, 122];
 const ICONS = [
   [0x18, 0x18, 0x30, 0x7c, 0x18, 0x30, 0x20, 0x00], // power: bolt
   [0x66, 0xff, 0xff, 0x7e, 0x3c, 0x18, 0x00, 0x00], // life support: heart
@@ -736,45 +738,49 @@ function drawLegendItem(index, label, x, y) {
 
 function drawFooter() {
   const legend = [
-    [0, "POWER", 12, 171], [1, "LIFE SUPPORT", 84, 171], [2, "PROCESSING", 164, 171],
-    [RADIOACTIVE_ICON, "RADIOACTIVE", 244, 171],
-    [3, "ENGINEERING", 12, 185], [4, "GUIDANCE", 84, 185],
-    [5, "ENGINES", 164, 185], [6, "SENSORS", 244, 185]
+    [0, "POWER", 12, 173], [1, "LIFE SUPPORT", 84, 173], [2, "PROCESSING", 164, 173],
+    [RADIOACTIVE_ICON, "RADIOACTIVE", 244, 173],
+    [3, "ENGINEERING", 12, 187], [4, "GUIDANCE", 84, 187],
+    [5, "ENGINES", 164, 187], [6, "SENSORS", 244, 187]
   ];
   legend.forEach(([index, label, x, y]) => {
     drawIcon(index, x, y);
     tinyTextAt(label, x + 8, y + 2);
   });
   if (performance.now() < deniedUntil) {
-    fillRect(10, 151, 300, 9, C.win);
-    textAt("ACTION LOCKED, COOLING, OR TOO COSTLY", 12, 151, C.offline);
+    fillRect(10, 137, 300, 8, C.win);
+    textAt("ACTION LOCKED, COOLING, OR TOO COSTLY", 12, 137, C.offline);
   }
 }
 
 function drawEventPanel() {
-  fillRect(12, 131, 296, 17, C.win);
+  fillRect(12, 145, 296, 24, C.win);
   if (!eventType) return;
 
-  fillRoundRect(12, 131, 296, 16, 3, C.border);
-  fillRoundRect(14, 133, 292, 12, 2, C.win);
+  fillRoundRect(12, 151, 296, 18, 3, C.border);
+  fillRoundRect(14, 153, 292, 14, 2, C.win);
+
+  const category = eventType === "decision" || (eventType === "result" && eventMode === "trade")
+    ? "OPPORTUNITY" : "CHALLENGE";
+  tinyTextAt(category, 20, 146, C.value);
 
   if (eventType === "decision") {
-    textAt(eventDescription, 20, 134, C.title);
-    drawPriceTerm(eventRadioactiveOffer ? 1 : -1, eventSource, 124, 134);
-    drawPriceTerm(eventGain, eventDest, 148, 134);
-    textAt("Y/N", 268, 134, C.value);
-    fillRect(20, 143, 276, 2, C.selected);
-    fillRect(20, 143, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
+    textAt(eventDescription, 20, 157, C.title);
+    drawPriceTerm(eventRadioactiveOffer ? 1 : -1, eventSource, 124, 157);
+    drawPriceTerm(eventGain, eventDest, 148, 157);
+    textAt("Y/N", 268, 157, C.value);
+    fillRect(20, 165, 276, 2, C.selected);
+    fillRect(20, 165, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
     return;
   }
 
   if (eventType === "code") {
-    textAt(eventDescription, 20, 134, C.title);
+    textAt(eventDescription, 20, 157, C.title);
     const remainingCode = eventCode.map((digit, index) => index < eventEntered.length ? " " : digit).join("");
-    textAt(remainingCode, 200, 134, C.value);
-    drawEventEffect(240, 134);
-    fillRect(20, 143, 276, 2, C.selected);
-    fillRect(20, 143, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
+    textAt(remainingCode, 200, 157, C.value);
+    drawEventEffect(240, 157);
+    fillRect(20, 165, 276, 2, C.selected);
+    fillRect(20, 165, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
     return;
   }
 
@@ -792,14 +798,14 @@ function drawEventPanel() {
   }[eventResult];
   const color = ["failed", "radioactiveIncreased", "cleanupFailed"].includes(eventResult) ? C.offline :
     ["trade", "salvage", "radioactiveCleared", "leakPrevented"].includes(eventResult) ? C.online : C.text;
-  textAt(resultText, 20, 134, color);
+  textAt(resultText, 20, 157, color);
   if (eventResult === "trade") {
     if (eventRadioactiveOffer) {
-      drawPriceTerm(1, RADIOACTIVE_ICON, 156, 134);
-      drawPriceTerm(eventGain, eventDest, 180, 134);
-    } else drawPriceTerm(eventGain, eventDest, 180, 134);
+      drawPriceTerm(1, RADIOACTIVE_ICON, 156, 157);
+      drawPriceTerm(eventGain, eventDest, 180, 157);
+    } else drawPriceTerm(eventGain, eventDest, 180, 157);
   } else if (["salvage", "prevented", "failed", "missed", "radioactiveCleared", "leakPrevented", "radioactiveIncreased", "cleanupFailed"].includes(eventResult)) {
-    drawEventEffect(180, 134);
+    drawEventEffect(180, 157);
   }
 }
 
@@ -995,7 +1001,7 @@ document.addEventListener("keydown", event => {
     if (!event.repeat) enterEventDigit(Number(key));
     return;
   }
-  const actionIndex = ["p", "l", "o", "e", "g", "n", "s"].indexOf(key);
+  const actionIndex = ACTION_KEYS.indexOf(key.toUpperCase());
   if (actionIndex >= 0 && !event.repeat) {
     event.preventDefault();
     performAction(actionIndex);

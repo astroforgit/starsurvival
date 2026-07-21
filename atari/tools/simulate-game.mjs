@@ -10,7 +10,7 @@ const INITIAL = [2, 7, 9, 2, 2, 1, 3];
 const BASE_GAIN = [2, 1, 3, 2, 2, 3, 2];
 const BASE_POWER_COST = [0, 1, 1, 2, 1, 3, 1];
 const LIFE_COST = [0, 0, 0, 0, 0, 1, 0];
-const BASE_PROCESSING_COST = [1, 0, 0, 2, 0, 1, 1];
+const BASE_PROCESSING_COST = [1, 0, 0, 2, 0, 0, 1];
 const BIT = [1, 2, 4, 8, 16, 32, 64];
 const SPECIAL_NAME = { 3: "INSTALL SOURCE", 4: "PLOT COURSE", 5: "ACTIVATE JUMPDRIVE", 6: "SCAN SECTOR" };
 

@@ -14,7 +14,7 @@ Naprawy zwiększają stałe obciążenie statku, odejmowane co 20 sekund. Modyfi
 
 STEROWANIE
 
-- P/L/O/E/G/N/S – bezpośrednie uruchomienie akcji systemu
+- P/L/O/E/G/I/S – bezpośrednie uruchomienie akcji systemu
 - A/U/D – zakup modyfikacji Amount, Auto lub Speed
 - Y/N – przyjęcie lub odrzucenie oferty
 - klawisze 0–9 – wprowadzanie czterocyfrowych kodów alarmowych
