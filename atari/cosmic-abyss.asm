@@ -177,7 +177,7 @@ vbreg_main_vctl
         jsr draw_briefing_screen
         lda brief_skipped
         bne ?begin_game
-        jsr wait_title_input
+        jsr wait_continue_input
 ?begin_game
         jsr game_init
         jsr draw_screen
@@ -189,10 +189,12 @@ vbreg_main_vctl
 ; recurring ship load continue in real time.
 ;=============================================================================
 selected dta 0
+difficulty dta 0                ; 0 Normal, 1 Easy, 2 Very Easy
 old_stick dta 15
 old_fire dta 1
 frame50  dta 0
 load_sec dta 20
+load_interval dta 20
 game_mode dta 0                ; 0 playing, 1 won, 2 lost
 message_timer dta 0
 cooldown_ready dta 0
@@ -228,13 +230,24 @@ relax_release dta 0
 ; Per-action immediate deltas. Positive values repair the selected system;
 ; costs are subtracted explicitly in perform_action.
 gain_tab dta 2,1,3,2,2,3,2
-base_gain dta 2,1,3,2,2,3,2
 cost_pwr dta 0,1,1,2,1,3,1
 cost_lif dta 0,0,0,0,0,1,0
 cost_prc dta 1,0,0,2,0,0,1
-base_cost_pwr dta 0,1,1,2,1,3,1
-base_cost_prc dta 1,0,0,2,0,0,1
 bit_tab  dta 1,2,4,8,16,32,64
+
+; Seven entries per difficulty: Normal, Easy, Very Easy.
+difficulty_health
+        dta 2,7,9,2,2,1,3, 3,8,10,2,2,1,3, 5,9,10,3,3,2,4
+difficulty_gain
+        dta 2,1,3,2,2,3,2, 3,2,4,2,2,3,2, 4,3,5,3,3,4,3
+difficulty_cost_pwr
+        dta 0,1,1,2,1,3,1, 0,1,1,1,1,2,1, 0,0,1,1,0,1,0
+difficulty_cost_lif
+        dta 0,0,0,0,0,1,0, 0,0,0,0,0,1,0, 0,0,0,0,0,0,0
+difficulty_cost_prc
+        dta 1,0,0,2,0,0,1, 1,0,0,1,0,0,0, 0,0,0,1,0,0,0
+difficulty_initial_load dta 4,6,8
+difficulty_load_interval dta 20,24,30
 
 names_lo dta <s_power,<s_life,<s_process,<s_engineer,<s_guidance,<s_engines,<s_sensors
 names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_sensors
@@ -279,9 +292,8 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
 
 .proc game_init
         ldx #6
-?copy   lda initial_health,x
+?copy   lda #0
         sta health,x
-        lda #0
         sta cooldown,x
         sta cooldown_frac,x
         sta clicks,x
@@ -318,8 +330,11 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         jsr init_events
         lda #$FF
         sta failure_system
-        lda #4
+        ldx difficulty
+        lda difficulty_initial_load,x
         sta load_sec
+        lda difficulty_load_interval,x
+        sta load_interval
         lda RTCLOK+2            ; choose 60..120 seconds from the live OS clock
         eor RTCLOK+1
         eor VCOUNT
@@ -333,20 +348,34 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         clc
         adc #60
         sta relax_sec
-        ldx #6
-?gain   lda base_gain,x
+        lda difficulty
+        sta ?preset_offset
+        asl
+        asl
+        asl
+        sec
+        sbc ?preset_offset      ; difficulty * 7
+        tay
+        ldx #0
+?gain   lda difficulty_health,y
+        sta health,x
+        lda difficulty_gain,y
         sta gain_tab,x
-        lda base_cost_pwr,x
+        lda difficulty_cost_pwr,y
         sta cost_pwr,x
-        lda base_cost_prc,x
+        lda difficulty_cost_lif,y
+        sta cost_lif,x
+        lda difficulty_cost_prc,y
         sta cost_prc,x
-        dex
-        bpl ?gain
+        iny
+        inx
+        cpx #7
+        bne ?gain
         lda #1
         sta old_fire
         rts
+?preset_offset dta 0
 .endp
-initial_health dta 2,7,9,2,2,1,3
 
 ; Direct action keys: P/L/O/E/G/I/S. Modification keys: A/U/D.
 ; Values are Atari OS CH scan codes (unshifted letters).
@@ -475,7 +504,9 @@ initial_health dta 2,7,9,2,2,1,3
 ?done   rts
 .endp
 
-amount_upgraded dta 5,3,7
+amount_upgraded dta 5,3,7, 6,4,8, 7,5,9
+amount_power_prc_cost dta 2,1,0
+amount_processing_pwr_cost dta 2,1,1
 .proc select_modification      ; X=resource system 0..2
         stx ?system
         lda bit_tab,x
@@ -485,21 +516,33 @@ amount_upgraded dta 5,3,7
         bne ?auto
         lda amount_mask
         and ?bit
-        bne ?done
+        beq ?amount_available
+        jmp ?done
+?amount_available
         lda amount_mask
         ora ?bit
         sta amount_mask
-        ldx ?system
+        lda difficulty
+        asl
+        clc
+        adc difficulty
+        clc
+        adc ?system
+        tax
         lda amount_upgraded,x
+        ldx ?system
         sta gain_tab,x
         cpx #0
         bne ?processing_cost
-        lda #2
+        ldx difficulty
+        lda amount_power_prc_cost,x
         sta cost_prc
 ?processing_cost
+        ldx ?system
         cpx #2
         bne ?close
-        lda #2
+        ldx difficulty
+        lda amount_processing_pwr_cost,x
         sta cost_pwr+2
         bne ?close
 ?auto   cmp #2
@@ -905,7 +948,7 @@ mod_check_mask dta 0
         ; Repainting every complete row once per second made the live columns
         ; visibly flash even though no row content had changed.
         bne ?r
-        lda #20
+        lda load_interval
         sta load_sec
         lda health
         sec
@@ -2387,17 +2430,18 @@ vbreg_title_bank_off
         sta calc_x
         lda #0
         sta calc_x+1
-        lda #178
+        lda #164
         sta calc_y
         lda #184
         sta fr_w
         lda #0
         sta fr_w+1
-        lda #17
+        lda #31
         sta fr_h
         lda #C_WIN
         sta fr_col
         jsr fill_round_rect
+        jsr draw_title_difficulty
         lda #80
         sta text_x
         lda #0
@@ -2406,6 +2450,41 @@ vbreg_title_bank_off
         sta text_y
         lda #<s_title_start
         ldx #>s_title_start
+        ldy #C_VALUE
+        jmp text_at
+.endp
+
+difficulty_name_lo dta <s_difficulty_normal,<s_difficulty_easy,<s_difficulty_very_easy
+difficulty_name_hi dta >s_difficulty_normal,>s_difficulty_easy,>s_difficulty_very_easy
+.proc draw_title_difficulty
+        lda #70
+        sta calc_x
+        lda #0
+        sta calc_x+1
+        lda #166
+        sta calc_y
+        lda #180
+        sta fr_w
+        lda #0
+        sta fr_w+1
+        lda #10
+        sta fr_h
+        lda #C_WIN
+        sta fr_col
+        jsr fill_rect
+        lda #72
+        sta text_x
+        lda #0
+        sta text_x+1
+        lda #169
+        sta text_y
+        ldx difficulty
+        lda difficulty_name_lo,x
+        sta txt_ptr
+        lda difficulty_name_hi,x
+        sta txt_ptr+1
+        lda txt_ptr
+        ldx txt_ptr+1
         ldy #C_VALUE
         jmp text_at
 .endp
@@ -2715,6 +2794,37 @@ vbreg_briefing_bank_off
         lda CH
         and #$3F
         cmp #$21                ; Space
+        beq ?start
+        cmp #$3A                ; D cycles Normal/Easy/Very Easy
+        bne ?wait
+        lda #$FF
+        sta CH
+        inc difficulty
+        lda difficulty
+        cmp #3
+        bcc ?redraw
+        lda #0
+        sta difficulty
+?redraw jsr draw_title_difficulty
+        jmp ?wait
+?start  lda #$FF
+        sta CH
+        rts
+.endp
+
+.proc wait_continue_input
+        lda #$FF
+        sta CH
+?release
+        jsr wait_frame
+        lda STRIG0
+        beq ?release
+?wait   jsr wait_frame
+        lda STRIG0
+        beq ?start
+        lda CH
+        and #$3F
+        cmp #$21                ; Space
         bne ?wait
 ?start  lda #$FF
         sta CH
@@ -2822,6 +2932,10 @@ frac5 dta 0,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,4,4,4,4,
 frac3 dta 0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3
 frac10 dta 0,1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4,5,5,5,5,5,6,6,7,7,7,7,7,8,8,8,8,8,9,9,9,9,9,10,10,10,10,10,10,10,10
 frac20 dta 0,1,1,2,2,2,3,3,4,4,4,5,5,6,6,6,7,7,8,8,8,9,9,10,10,10,11,11,12,12,12,13,13,14,14,14,15,15,16,16,16,17,17,18,18,18,19,19,20,20,20
+load_width_easy
+        dta 0,3,5,8,10,13,15,18,20,23,25,28,30,33,35,38,40,43,45,48,50,53,55,58,60,60,60,60,60,60,60
+load_width_very_easy
+        dta 0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60
 
 .proc get_progress_width       ; X=system, A=remaining width (0..80)
         lda cooldown,x
@@ -2940,12 +3054,14 @@ frac20 dta 0,1,1,2,2,2,3,3,4,4,4,5,5,6,6,6,7,7,8,8,8,9,9,10,10,10,11,11,12,12,12
         jsr fill_rect
         lda load_sec
         beq ?advance
+        ldx difficulty
+        bne ?difficulty_load_width
         sec
         sbc #1
         sta ?seconds
         asl
         clc
-        adc ?seconds            ; (seconds-1) * 3
+        adc ?seconds            ; Normal: (seconds-1) * 3 plus frame fraction
         sta ?loadw
         lda #50
         sec
@@ -2954,6 +3070,18 @@ frac20 dta 0,1,1,2,2,2,3,3,4,4,4,5,5,6,6,6,7,7,8,8,8,9,9,10,10,10,11,11,12,12,12
         lda frac3,y
         clc
         adc ?loadw
+        jmp ?load_width_ready
+?difficulty_load_width
+        lda load_sec
+        tay
+        ldx difficulty
+        dex
+        beq ?easy_load_width
+        lda load_width_very_easy,y
+        bne ?load_width_ready
+?easy_load_width
+        lda load_width_easy,y
+?load_width_ready
         beq ?advance
         sta fr_w
         lda #C_LOADPROG
@@ -4451,11 +4579,11 @@ modal_detail_col dta 0
         jmp text_at
 .endp
 
-amount_old_gain dta 2,1,3
+amount_old_gain dta 2,1,3, 3,2,4, 4,3,5
 amount_cost_icon dta 2,0,0
-amount_old_cost dta 1,1,1
-amount_new_gain dta 5,3,7
-amount_new_cost dta 2,1,2
+amount_old_cost dta 1,1,1, 1,1,1, 0,0,1
+amount_new_gain dta 5,3,7, 6,4,8, 7,5,9
+amount_new_cost dta 2,1,2, 1,1,1, 0,0,1
 .proc draw_amount_modification_detail
         lda #70
         sta price_x
@@ -4466,13 +4594,21 @@ amount_new_cost dta 2,1,2
         adc #10
         sta price_y
 
-        ldx modal_idx
+        lda difficulty
+        asl
+        clc
+        adc difficulty
+        clc
+        adc modal_idx
+        sta ?detail_idx
+        tax
         lda amount_old_gain,x
         ldy #11                 ; '+'
         jsr draw_price_term
-        ldx modal_idx
+        ldx ?detail_idx
         lda amount_old_cost,x
         pha
+        ldx modal_idx
         lda amount_cost_icon,x
         tax
         pla
@@ -4494,18 +4630,20 @@ amount_new_cost dta 2,1,2
         sta price_x
         lda #0
         sta price_x+1
-        ldx modal_idx
+        ldx ?detail_idx
         lda amount_new_gain,x
         ldy #11
         jsr draw_price_term
-        ldx modal_idx
+        ldx ?detail_idx
         lda amount_new_cost,x
         pha
+        ldx modal_idx
         lda amount_cost_icon,x
         tax
         pla
         ldy #13
         jmp draw_price_term
+?detail_idx dta 0
 .endp
 
 s_power    dta c'POWER',0
@@ -4588,6 +4726,9 @@ s_denied   dta c'ACTION LOCKED, COOLING, OR TOO COSTLY',0
 s_won      dta c'ALL MAIN SYSTEMS ONLINE!',0
 s_lost     dta c'A SHIP SYSTEM WAS DESTROYED.',0
 s_title_start dta c'PRESS SPACE TO START',0
+s_difficulty_normal dta c'D DIFFICULTY: NORMAL',0
+s_difficulty_easy dta c'D DIFFICULTY: EASY',0
+s_difficulty_very_easy dta c'D DIFFICULTY: VERY EASY',0
 s_brief_title dta c'SHIP EMERGENCY LOG',0
 s_brief_line1 dta c'AN ASTEROID STRIKE HAS LEFT',0
 s_brief_line2 dta c'YOUR SHIP DRIFTING IN DARKNESS.',0
@@ -4651,6 +4792,7 @@ event_code      dta 0,0,0,0
 event_draw_idx  dta 0
 event_scan      dta 0
 event_tries     dta 0
+event_window_by_difficulty dta 10,12,15
 
 .proc event_random
         lda event_rng
@@ -4690,6 +4832,12 @@ event_tries     dta 0
         bcs ?mod
 ?ready clc
         adc #1                  ; blank pause of 1..5 seconds between events
+        ldx difficulty
+        beq ?store
+        clc
+        adc difficulty
+        adc difficulty          ; Easy +2 seconds, Very Easy +4 seconds
+?store
         sta event_next_sec
         rts
 .endp
@@ -4764,12 +4912,15 @@ event_tries     dta 0
         beq ?dest
         sta event_dest
 ?trade_gain
-        lda #2
+        lda difficulty
+        clc
+        adc #2
         sta event_gain          ; trade one point for two elsewhere
         jsr event_random
         and #3
         sta event_trade_desc
-        lda #10
+        ldx difficulty
+        lda event_window_by_difficulty,x
         sta event_window        ; same ten-second window as code challenges
         lda #4
         sta event_mode
@@ -4804,6 +4955,19 @@ event_tries     dta 0
         clc
         adc #1
         sta event_gain
+        lda event_mode
+        bne ?hazard_gain
+        lda event_gain
+        clc
+        adc difficulty          ; salvage improves with easier presets
+        sta event_gain
+        jmp ?description
+?hazard_gain
+        lda difficulty
+        beq ?description        ; Normal hazards retain their random 1..2 loss
+        lda #1
+        sta event_gain
+?description
         jsr event_random
         and #3
         sta event_desc
@@ -4811,7 +4975,21 @@ event_tries     dta 0
 ?radioactive_target
         lda #7
         sta event_dest
+        lda event_mode
+        cmp #3
+        beq ?cleanup_gain
+        lda difficulty
+        beq ?normal_radioactive_gain
+        lda #1                  ; easier leak failures add only one point
+        bne ?store_radioactive_gain
+?normal_radioactive_gain
         lda #2
+        bne ?store_radioactive_gain
+?cleanup_gain
+        lda difficulty
+        clc
+        adc #2                  ; cleanup removes 2/3/4 points
+?store_radioactive_gain
         sta event_gain
 ?radioactive_desc
         lda #0
@@ -4827,7 +5005,8 @@ event_tries     dta 0
         inx
         cpx #4
         bne ?digit
-        lda #10
+        ldx difficulty
+        lda event_window_by_difficulty,x
         sta event_window
         lda #2
         sta event_type
@@ -5100,8 +5279,12 @@ digit_scan_codes
         rts
 .endp
 
-event_width_lo dta <0,<27,<55,<82,<110,<138,<165,<193,<220,<248,<276
-event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
+event_width_normal_lo dta <0,<27,<55,<82,<110,<138,<165,<193,<220,<248,<276,<276,<276,<276,<276,<276
+event_width_normal_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276,>276,>276,>276,>276,>276
+event_width_easy_lo dta <0,<23,<46,<69,<92,<115,<138,<161,<184,<207,<230,<253,<276,<276,<276,<276
+event_width_easy_hi dta >0,>23,>46,>69,>92,>115,>138,>161,>184,>207,>230,>253,>276,>276,>276,>276
+event_width_very_easy_lo dta <0,<18,<37,<55,<74,<92,<110,<129,<147,<166,<184,<202,<221,<239,<258,<276
+event_width_very_easy_hi dta >0,>18,>37,>55,>74,>92,>110,>129,>147,>166,>184,>202,>221,>239,>258,>276
 
 .proc draw_event_progress
         lda #20
@@ -5120,9 +5303,24 @@ event_width_hi dta >0,>27,>55,>82,>110,>138,>165,>193,>220,>248,>276
         sta fr_col
         jsr fill_rect
         ldx event_window
-        lda event_width_lo,x
+        lda difficulty
+        beq ?normal_width
+        cmp #1
+        beq ?easy_width
+        lda event_width_very_easy_lo,x
         sta fr_w
-        lda event_width_hi,x
+        lda event_width_very_easy_hi,x
+        jmp ?width_ready
+?easy_width
+        lda event_width_easy_lo,x
+        sta fr_w
+        lda event_width_easy_hi,x
+        jmp ?width_ready
+?normal_width
+        lda event_width_normal_lo,x
+        sta fr_w
+        lda event_width_normal_hi,x
+?width_ready
         sta fr_w+1
         ora fr_w
         beq ?done

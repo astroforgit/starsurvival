@@ -11,6 +11,31 @@ const BASE_GAIN = [2, 1, 3, 2, 2, 3, 2];
 const BASE_POWER_COST = [0, 1, 1, 2, 1, 3, 1];
 const LIFE_COST = [0, 0, 0, 0, 0, 1, 0];
 const BASE_PROCESSING_COST = [1, 0, 0, 2, 0, 0, 1];
+const DIFFICULTIES = {
+  normal: {
+    initial: INITIAL, gain: BASE_GAIN, powerCost: BASE_POWER_COST, lifeCost: LIFE_COST,
+    processingCost: BASE_PROCESSING_COST, amountGain: [5, 3, 7], amountPowerCost: 2,
+    amountProcessingCost: 2, initialLoadDelay: 4, loadInterval: 20,
+    eventWindow: 10, eventWaitBonus: 0, tradeGain: 2, salvageBonus: 0, hazardMax: 2,
+    leakAmount: 2, cleanupAmount: 2
+  },
+  easy: {
+    initial: [3, 8, 10, 2, 2, 1, 3], gain: [3, 2, 4, 2, 2, 3, 2],
+    powerCost: [0, 1, 1, 1, 1, 2, 1], lifeCost: [0, 0, 0, 0, 0, 1, 0],
+    processingCost: [1, 0, 0, 1, 0, 0, 0], amountGain: [6, 4, 8],
+    amountPowerCost: 1, amountProcessingCost: 1, initialLoadDelay: 6, loadInterval: 24,
+    eventWindow: 12, eventWaitBonus: 2, tradeGain: 3, salvageBonus: 1, hazardMax: 1,
+    leakAmount: 1, cleanupAmount: 3
+  },
+  "very-easy": {
+    initial: [5, 9, 10, 3, 3, 2, 4], gain: [4, 3, 5, 3, 3, 4, 3],
+    powerCost: [0, 0, 1, 1, 0, 1, 0], lifeCost: [0, 0, 0, 0, 0, 0, 0],
+    processingCost: [0, 0, 0, 1, 0, 0, 0], amountGain: [7, 5, 9],
+    amountPowerCost: 1, amountProcessingCost: 0, initialLoadDelay: 8, loadInterval: 30,
+    eventWindow: 15, eventWaitBonus: 4, tradeGain: 4, salvageBonus: 2, hazardMax: 1,
+    leakAmount: 1, cleanupAmount: 4
+  }
+};
 const BIT = [1, 2, 4, 8, 16, 32, 64];
 const SPECIAL_NAME = { 3: "INSTALL SOURCE", 4: "PLOT COURSE", 5: "ACTIVATE JUMPDRIVE", 6: "SCAN SECTOR" };
 
@@ -18,6 +43,12 @@ function numberArg(name, fallback) {
   const prefix = `--${name}=`;
   const found = process.argv.find((arg) => arg.startsWith(prefix));
   return found ? Number(found.slice(prefix.length)) : fallback;
+}
+
+function stringArg(name, fallback) {
+  const prefix = `--${name}=`;
+  const found = process.argv.find((arg) => arg.startsWith(prefix));
+  return found ? found.slice(prefix.length) : fallback;
 }
 
 function hasArg(name) {
@@ -29,25 +60,29 @@ function clampResource(value) {
 }
 
 class AtariGame {
-  constructor(seed, { events = true } = {}) {
+  constructor(seed, { events = true, difficulty = "normal" } = {}) {
+    this.difficultyName = difficulty;
+    this.balance = DIFFICULTIES[difficulty];
     this.initialSeed = seed || 0xa7;
     this.seed = seed || 0xa7;
     this.eventsEnabled = events;
     this.frame = 0;
-    this.health = [...INITIAL];
-    this.minimum = [...INITIAL];
+    this.health = [...this.balance.initial];
+    this.minimum = [...this.balance.initial];
     this.cooldown = Array(7).fill(0);
     this.cooldownFull = Array(7).fill(500); // 10 seconds at 50 Hz
     this.unlocked = [true, false, false, false, false, false, false];
     this.clicks = Array(7).fill(0);
-    this.gain = [...BASE_GAIN];
-    this.powerCost = [...BASE_POWER_COST];
-    this.processingCost = [...BASE_PROCESSING_COST];
+    this.gain = [...this.balance.gain];
+    this.powerCost = [...this.balance.powerCost];
+    this.lifeCost = [...this.balance.lifeCost];
+    this.processingCost = [...this.balance.processingCost];
     this.loadPower = 0;
     this.loadLife = 1;
     this.systemLoadPower = Array(7).fill(0);
     this.systemLoadLife = [0, 1, 0, 0, 0, 0, 0];
-    this.loadFrames = 200; // The assembly's first deduction is after 4 seconds.
+    this.loadFrames = this.balance.initialLoadDelay * 50;
+    this.loadIntervalFrames = this.balance.loadInterval * 50;
     this.amountMask = 0;
     this.autoMask = 0;
     this.speedMask = 0;
@@ -63,7 +98,7 @@ class AtariGame {
     this.actions = [];
     this.loadHistory = [];
     this.event = null;
-    this.eventWait = this.eventsEnabled ? this.random(5) + 1 : Infinity;
+    this.eventWait = this.eventsEnabled ? this.random(5) + 1 + this.balance.eventWaitBonus : Infinity;
     this.secondFrame = 50;
   }
 
@@ -93,7 +128,7 @@ class AtariGame {
 
   safeToPay(system) {
     return this.health[0] > this.powerCost[system]
-      && this.health[1] > LIFE_COST[system]
+      && this.health[1] > this.lifeCost[system]
       && this.health[2] > this.processingCost[system];
   }
 
@@ -109,7 +144,7 @@ class AtariGame {
     // The assembly allows lethal costs; the bot calls safeToPay first.
     this.health[2] = Math.max(0, this.health[2] - this.processingCost[system]);
     this.health[0] = Math.max(0, this.health[0] - this.powerCost[system]);
-    this.health[1] = Math.max(0, this.health[1] - LIFE_COST[system]);
+    this.health[1] = Math.max(0, this.health[1] - this.lifeCost[system]);
     this.health[system] = Math.min(10, this.health[system] + this.gain[system]);
     this.clicks[system] += 1;
     this.addSystemLoad(system);
@@ -182,9 +217,9 @@ class AtariGame {
     this[`${type}Mask`] |= BIT[system];
     if (type === "amount") {
       this.amountOpened = true;
-      this.gain[system] = [5, 3, 7][system];
-      if (system === 0) this.processingCost[0] = 2;
-      if (system === 2) this.powerCost[2] = 2;
+      this.gain[system] = this.balance.amountGain[system];
+      if (system === 0) this.processingCost[0] = this.balance.amountProcessingCost;
+      if (system === 2) this.powerCost[2] = this.balance.amountPowerCost;
       this.updateProgress();
     } else if (type === "speed") {
       this.cooldownFull[system] = 250;
@@ -232,7 +267,7 @@ class AtariGame {
       let destination = this.random(3);
       while (destination === source) destination = this.random(3);
       this.random(4); // Description selection affects the assembly RNG stream.
-      this.event = { type: "trade", source, destination, radiationOffer, window: 10 };
+      this.event = { type: "trade", source, destination, radiationOffer, window: this.balance.eventWindow };
       return;
     }
     this.startCodeEvent();
@@ -243,14 +278,16 @@ class AtariGame {
     if (mode === 2 && this.radioactive >= 9) mode = 0;
     if (mode === 3 && this.radioactive < 2) mode = 1;
     let destination = 7;
-    let gain = 2;
+    let gain = mode === 2 ? this.balance.leakAmount : this.balance.cleanupAmount;
     if (mode < 2) {
       destination = this.random(3);
-      gain = this.random(2) + 1;
+      gain = mode === 0
+        ? this.random(2) + 1 + this.balance.salvageBonus
+        : this.random(this.balance.hazardMax) + 1;
       this.random(4); // Description.
     }
     for (let i = 0; i < 4; i += 1) this.random(10); // Challenge digits.
-    this.event = { type: "code", mode, destination, gain, entered: 0, window: 10 };
+    this.event = { type: "code", mode, destination, gain, entered: 0, window: this.balance.eventWindow };
   }
 
   answerEvent() {
@@ -263,7 +300,7 @@ class AtariGame {
       const accept = false;
       if (accept) {
         this.health[source] -= 1;
-        this.health[destination] = clampResource(this.health[destination] + 2);
+        this.health[destination] = clampResource(this.health[destination] + this.balance.tradeGain);
         this.record("EVENT TRADE ACCEPTED", `${NAMES[source]} -> ${NAMES[destination]}`);
       }
       this.event = { type: "result", window: 1 };
@@ -287,7 +324,7 @@ class AtariGame {
       this.event.window -= 1;
       if (this.event.window <= 0) {
         this.event = null;
-        this.eventWait = this.random(5) + 1;
+        this.eventWait = this.random(5) + 1 + this.balance.eventWaitBonus;
       }
       return;
     }
@@ -328,7 +365,7 @@ class AtariGame {
       this.tickEvents();
     }
     if (this.loadFrames === 0 && this.mode === "playing") {
-      this.loadFrames = 1000;
+      this.loadFrames = this.loadIntervalFrames;
       this.health[0] = Math.max(0, this.health[0] - this.loadPower);
       this.health[1] = Math.max(0, this.health[1] - this.loadLife);
       this.loadHistory.push({ time: this.seconds(), power: this.loadPower, life: this.loadLife, health: [...this.health] });
@@ -371,7 +408,7 @@ class KeySpamBot {
   survivesNextLoad(system) {
     const g = this.game;
     let power = g.health[0] - g.powerCost[system];
-    let life = g.health[1] - LIFE_COST[system];
+    let life = g.health[1] - g.lifeCost[system];
     if (system === 0) power = Math.min(10, power + g.gain[0]);
     if (system === 1) life = Math.min(10, life + g.gain[1]);
     // If Generate Power/Cycle Air will be ready before the deduction, the bot
@@ -441,7 +478,7 @@ class KeySpamBot {
       // postpone them until Install Source has completed.
       if (!g.sourceInstalled && g.clicks[system] >= 2) continue;
       const powerAfter = g.health[0] - g.powerCost[system];
-      const lifeAfter = g.health[1] - LIFE_COST[system];
+      const lifeAfter = g.health[1] - g.lifeCost[system];
       const added = this.addedLoad(system);
       const reservePower = Math.min(10, Math.max(2, g.loadPower + added.power + 1));
       const reserveLife = Math.min(10, Math.max(2, g.loadLife + added.life + 1));
@@ -487,7 +524,7 @@ function printRun(game, verbose) {
   console.log(`${status} seed=${game.initialSeed.toString(16).padStart(2, "0")} time=${game.seconds().toFixed(2)}s`);
   console.log(`  final: ${NAMES.map((name, i) => `${name}=${game.health[i]}`).join(" ")} RADIOACTIVE=${game.radioactive}`);
   console.log(`  minimum: ${NAMES.slice(0, 3).map((name, i) => `${name}=${game.minimum[i]}`).join(" ")}`);
-  console.log(`  final recurring load: -${game.loadPower} Power / -${game.loadLife} Life every 20s`);
+  console.log(`  difficulty: ${game.difficultyName}; recurring load: -${game.loadPower} Power / -${game.loadLife} Life every ${game.balance.loadInterval}s`);
   console.log(`  repairs: E=${game.clicks[3]} G=${game.clicks[4]} N=${game.clicks[5]} S=${game.clicks[6]}; source=${game.sourceInstalled ? "installed" : "not installed"}`);
   if (game.failure) console.log(`  stopped: ${game.failure}`);
   if (verbose) {
@@ -500,8 +537,11 @@ function printRun(game, verbose) {
 
 const runs = Math.max(1, numberArg("runs", 100));
 const firstSeed = Math.max(1, numberArg("seed", 1)) & 0xff;
+const difficulty = stringArg("difficulty", "normal");
+if (!DIFFICULTIES[difficulty]) throw new Error(`Unknown difficulty: ${difficulty}`);
 const options = {
   events: !hasArg("no-events"),
+  difficulty,
   maxSeconds: numberArg("max-seconds", 600),
   scale: numberArg("scale", 0),
 };
@@ -519,7 +559,7 @@ if (runs === 1) {
   const losses = results.filter((game) => game.mode === "lost");
   const timeouts = results.filter((game) => game.mode === "timeout");
   const times = wins.map((game) => game.seconds());
-  console.log(`Atari accelerated simulation: ${runs} deterministic RNG seeds`);
+  console.log(`Atari accelerated simulation: ${runs} deterministic RNG seeds (${difficulty})`);
   console.log(`  wins=${wins.length} losses=${losses.length} timeouts=${timeouts.length}`);
   if (wins.length) {
     console.log(`  win time: min=${Math.min(...times).toFixed(2)}s avg=${(times.reduce((a, b) => a + b, 0) / times.length).toFixed(2)}s max=${Math.max(...times).toFixed(2)}s`);

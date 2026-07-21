@@ -14,6 +14,31 @@ const BASE_GAIN = [2, 1, 3, 2, 2, 3, 2];
 const COST_PWR = [0, 1, 1, 2, 1, 3, 1];
 const COST_LIF = [0, 0, 0, 0, 0, 1, 0];
 const COST_PRC = [1, 0, 0, 2, 0, 0, 1];
+const DIFFICULTIES = [
+  {
+    name: "NORMAL", initial: INITIAL_HEALTH, gain: BASE_GAIN,
+    powerCost: COST_PWR, lifeCost: COST_LIF, processingCost: COST_PRC,
+    amountGain: [5, 3, 7], amountPowerCost: 2, amountProcessingCost: 2,
+    initialLoadDelay: 4, loadInterval: 20, eventWindow: 10, eventWaitBonus: 0,
+    tradeGain: 2, salvageBonus: 0, hazardMax: 2, leakAmount: 2, cleanupAmount: 2
+  },
+  {
+    name: "EASY", initial: [3, 8, 10, 2, 2, 1, 3], gain: [3, 2, 4, 2, 2, 3, 2],
+    powerCost: [0, 1, 1, 1, 1, 2, 1], lifeCost: [0, 0, 0, 0, 0, 1, 0],
+    processingCost: [1, 0, 0, 1, 0, 0, 0],
+    amountGain: [6, 4, 8], amountPowerCost: 1, amountProcessingCost: 1,
+    initialLoadDelay: 6, loadInterval: 24, eventWindow: 12, eventWaitBonus: 2,
+    tradeGain: 3, salvageBonus: 1, hazardMax: 1, leakAmount: 1, cleanupAmount: 3
+  },
+  {
+    name: "VERY EASY", initial: [5, 9, 10, 3, 3, 2, 4], gain: [4, 3, 5, 3, 3, 4, 3],
+    powerCost: [0, 0, 1, 1, 0, 1, 0], lifeCost: [0, 0, 0, 0, 0, 0, 0],
+    processingCost: [0, 0, 0, 1, 0, 0, 0],
+    amountGain: [7, 5, 9], amountPowerCost: 1, amountProcessingCost: 0,
+    initialLoadDelay: 8, loadInterval: 30, eventWindow: 15, eventWaitBonus: 4,
+    tradeGain: 4, salvageBonus: 2, hazardMax: 1, leakAmount: 1, cleanupAmount: 4
+  }
+];
 const NAMES = ["POWER", "LIFE SUPPORT", "PROCESSING", "ENGINEERING", "GUIDANCE", "ENGINES", "SENSORS"];
 const ACTION_KEYS = ["P", "L", "O", "E", "G", "I", "S"];
 const EVENT_TEST_MODE = true;
@@ -58,10 +83,12 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const announcement = document.querySelector("#announcement");
 const titleScreen = document.querySelector("#title-screen");
 const titleArt = document.querySelector("#title-art");
+const difficultyLabel = document.querySelector("#difficulty-label");
 titleArt.src = titleImageUrl;
 ctx.imageSmoothingEnabled = false;
 
 let titleActive = true;
+let difficultyIndex = 0;
 let briefingActive = false;
 let briefingChars = 0;
 let briefingStarted = 0;
@@ -79,6 +106,7 @@ let systemLoadPwr;
 let systemLoadLif;
 let gainTab;
 let actionCostPwr;
+let actionCostLif;
 let actionCostPrc;
 let amountMask;
 let autoMask;
@@ -153,10 +181,11 @@ function isActionActive(index) {
 }
 
 function gameInit() {
+  const difficulty = DIFFICULTIES[difficultyIndex];
   selected = 0;
-  loadSec = 4;
+  loadSec = difficulty.initialLoadDelay;
   gameMode = 0;
-  health = [...INITIAL_HEALTH];
+  health = [...difficulty.initial];
   cooldown = [0, 0, 0, 0, 0, 0, 0];
   cooldownMax = [10, 10, 10, 10, 10, 10, 10];
   unlocked = [1, 0, 0, 0, 0, 0, 0];
@@ -165,9 +194,10 @@ function gameInit() {
   loadLif = 1;
   systemLoadPwr = [0, 0, 0, 0, 0, 0, 0];
   systemLoadLif = [0, 1, 0, 0, 0, 0, 0];
-  gainTab = [...BASE_GAIN];
-  actionCostPwr = [...COST_PWR];
-  actionCostPrc = [...COST_PRC];
+  gainTab = [...difficulty.gain];
+  actionCostPwr = [...difficulty.powerCost];
+  actionCostLif = [...difficulty.lifeCost];
+  actionCostPrc = [...difficulty.processingCost];
   amountMask = 0;
   autoMask = 0;
   speedMask = 0;
@@ -181,7 +211,7 @@ function gameInit() {
   radioactive = 0;
   deniedUntil = 0;
   initEvents();
-  announce("New game. Power selected.");
+  announce(`${difficulty.name} game. Power selected.`);
   drawScreen();
 }
 
@@ -190,7 +220,7 @@ function randomInt(max) {
 }
 
 function scheduleNextEvent() {
-  eventNextSec = 1 + randomInt(5);
+  eventNextSec = 1 + randomInt(5) + DIFFICULTIES[difficultyIndex].eventWaitBonus;
 }
 
 function initEvents() {
@@ -210,6 +240,7 @@ function initEvents() {
 }
 
 function startRandomEvent() {
+  const difficulty = DIFFICULTIES[difficultyIndex];
   const safeSources = [0, 1, 2].filter(index => health[index] >= 2);
   eventRadioactiveOffer = false;
   if (Math.random() < 0.75 && (safeSources.length || radioactive < 10)) {
@@ -224,9 +255,9 @@ function startRandomEvent() {
       const destinations = [0, 1, 2].filter(index => index !== eventSource);
       eventDest = destinations[randomInt(destinations.length)];
     }
-    eventGain = 2;
+    eventGain = difficulty.tradeGain;
     eventDescription = TRADE_PROMPTS[randomInt(TRADE_PROMPTS.length)];
-    eventWindow = 10;
+    eventWindow = difficulty.eventWindow;
   } else {
     eventType = "code";
     const modes = ["salvage", "hazard"];
@@ -234,9 +265,10 @@ function startRandomEvent() {
     if (radioactive >= 2) modes.push("clearRadioactiveLeak");
     eventMode = modes[randomInt(modes.length)];
     eventDest = eventMode === "salvage" || eventMode === "hazard" ? randomInt(3) : RADIOACTIVE_ICON;
-    eventGain = eventMode === "radioactiveLeak" || eventMode === "clearRadioactiveLeak"
-      ? 2
-      : 1 + randomInt(2);
+    if (eventMode === "radioactiveLeak") eventGain = difficulty.leakAmount;
+    else if (eventMode === "clearRadioactiveLeak") eventGain = difficulty.cleanupAmount;
+    else if (eventMode === "salvage") eventGain = 1 + randomInt(2) + difficulty.salvageBonus;
+    else eventGain = 1 + randomInt(difficulty.hazardMax);
     eventCode = Array.from({ length: 4 }, () => randomInt(10));
     if (eventMode === "radioactiveLeak") eventDescription = "RADIOACTIVE LEAK";
     else if (eventMode === "clearRadioactiveLeak") eventDescription = "CLEAR RADIOACTIVE LEAK";
@@ -245,7 +277,7 @@ function startRandomEvent() {
       eventDescription = descriptions[randomInt(descriptions.length)];
     }
     eventEntered = "";
-    eventWindow = 10;
+    eventWindow = difficulty.eventWindow;
   }
   updateEventControls();
   announce(eventType === "decision" ? "Robot trade offer. Press Y or N." : "Emergency code event. Enter four digits.");
@@ -372,6 +404,16 @@ function startGame() {
   return true;
 }
 
+function cycleDifficulty() {
+  if (!titleActive) return false;
+  difficultyIndex = (difficultyIndex + 1) % DIFFICULTIES.length;
+  const name = DIFFICULTIES[difficultyIndex].name;
+  difficultyLabel.textContent = `D DIFFICULTY: ${name}`;
+  titleScreen.setAttribute("aria-label", `Cosmic Abyss title screen. Difficulty ${name}.`);
+  announce(`Difficulty ${name}.`);
+  return true;
+}
+
 function advanceBriefing() {
   if (!briefingActive) return false;
   briefingActive = false;
@@ -398,7 +440,7 @@ function performAction(actionIndex = selected) {
 
   health[2] = Math.max(-1, health[2] - actionCostPrc[i]);
   health[0] = Math.max(-1, health[0] - actionCostPwr[i]);
-  health[1] = Math.max(-1, health[1] - COST_LIF[i]);
+  health[1] = Math.max(-1, health[1] - actionCostLif[i]);
   health[i] = clamp(health[i] + gainTab[i], 0, 10);
   clicks[i]++;
   addSystemLoad(i);
@@ -529,10 +571,11 @@ function selectModification(index) {
   if (getMask(modalType) & bit) return;
   const type = modalType;
   if (type === "amount") {
+    const difficulty = DIFFICULTIES[difficultyIndex];
     amountMask |= bit;
-    gainTab[index] = [5, 3, 7][index];
-    if (index === 0) actionCostPrc[0] = 2;
-    if (index === 2) actionCostPwr[2] = 2;
+    gainTab[index] = difficulty.amountGain[index];
+    if (index === 0) actionCostPrc[0] = difficulty.amountProcessingCost;
+    if (index === 2) actionCostPwr[2] = difficulty.amountPowerCost;
   } else if (type === "auto") {
     autoMask |= bit;
   } else {
@@ -564,7 +607,7 @@ function tickGame(deltaSeconds) {
   loadSec -= deltaSeconds;
 
   if (loadSec <= 0) {
-    loadSec += 20;
+    loadSec += DIFFICULTIES[difficultyIndex].loadInterval;
     health[0] = clamp(health[0] - loadPwr, 0, 10);
     health[1] = clamp(health[1] - loadLif, 0, 10);
     announce(`Load cycle deducted ${loadPwr} power and ${loadLif} life support.`);
@@ -677,7 +720,8 @@ function drawRows() {
       fillRoundRect(112, y, Math.round(100 * progress), 14, 3, C.cooldown);
     }
     if ((systemLoadPwr[i] || systemLoadLif[i]) && loadSec > 0) {
-      fillRoundRect(212, y, Math.round(72 * loadSec / 20), 14, 3, C.loadProgress);
+      const loadProgress = Math.min(1, loadSec / DIFFICULTIES[difficultyIndex].loadInterval);
+      fillRoundRect(212, y, Math.round(72 * loadProgress), 14, 3, C.loadProgress);
     }
     if (isActionActive(i)) textAt(ACTION_KEYS[i], 8, y + 3, C.value);
     drawIcon(i, 20, y + 3);
@@ -706,7 +750,7 @@ function drawPriceTerm(value, icon, x, y) {
 function drawActionPrice(index, x, y) {
   const terms = [{ value: gainTab[index], icon: index }];
   if (actionCostPwr[index]) terms.push({ value: -actionCostPwr[index], icon: 0 });
-  if (COST_LIF[index]) terms.push({ value: -COST_LIF[index], icon: 1 });
+  if (actionCostLif[index]) terms.push({ value: -actionCostLif[index], icon: 1 });
   if (actionCostPrc[index]) terms.push({ value: -actionCostPrc[index], icon: 2 });
   terms.forEach((term, position) => drawPriceTerm(term.value, term.icon, x + position * 24, y));
 }
@@ -770,7 +814,7 @@ function drawEventPanel() {
     drawPriceTerm(eventGain, eventDest, 148, 157);
     textAt("Y/N", 268, 157, C.value);
     fillRect(20, 165, 276, 2, C.selected);
-    fillRect(20, 165, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
+    fillRect(20, 165, Math.max(0, Math.round(276 * eventWindow / DIFFICULTIES[difficultyIndex].eventWindow)), 2, C.cooldown);
     return;
   }
 
@@ -780,7 +824,7 @@ function drawEventPanel() {
     textAt(remainingCode, 200, 157, C.value);
     drawEventEffect(240, 157);
     fillRect(20, 165, 276, 2, C.selected);
-    fillRect(20, 165, Math.max(0, Math.round(276 * eventWindow / 10)), 2, C.cooldown);
+    fillRect(20, 165, Math.max(0, Math.round(276 * eventWindow / DIFFICULTIES[difficultyIndex].eventWindow)), 2, C.cooldown);
     return;
   }
 
@@ -916,11 +960,12 @@ function drawModificationModal() {
 }
 
 function drawAmountModificationDetail(index, y, arrowColor) {
-  const oldGain = [2, 1, 3][index];
+  const difficulty = DIFFICULTIES[difficultyIndex];
+  const oldGain = difficulty.gain[index];
   const costIcon = [2, 0, 0][index];
-  const oldCost = [1, 1, 1][index];
-  const newGain = [5, 3, 7][index];
-  const newCost = [2, 1, 2][index];
+  const oldCost = [difficulty.processingCost[0], difficulty.powerCost[1], difficulty.powerCost[2]][index];
+  const newGain = difficulty.amountGain[index];
+  const newCost = [difficulty.amountProcessingCost, difficulty.powerCost[1], difficulty.amountPowerCost][index];
   drawPriceTerm(oldGain, index, 70, y);
   drawPriceTerm(-oldCost, costIcon, 94, y);
   textAt(">", 120, y, arrowColor);
@@ -959,6 +1004,11 @@ function announce(message) {
 
 document.addEventListener("keydown", event => {
   if (titleActive) {
+    if (event.key.toLowerCase() === "d") {
+      event.preventDefault();
+      if (!event.repeat) cycleDifficulty();
+      return;
+    }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       startGame();
@@ -1028,6 +1078,7 @@ document.querySelectorAll("[data-control]").forEach(button => {
   button.addEventListener("click", () => {
     if (titleActive) {
       if (button.dataset.control === "fire") startGame();
+      else if (button.dataset.control === "speed") cycleDifficulty();
       return;
     }
     if (briefingActive) {

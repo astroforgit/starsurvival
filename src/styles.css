@@ -166,15 +166,16 @@ canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--phosphor-bright); }
 
 .title-copy span {
   position: absolute;
-  bottom: 5%;
   left: 50%;
   width: max-content;
   transform: translateX(-50%);
   font: 700 clamp(7px, 1vw, 12px)/1 "Lucida Console", "DejaVu Sans Mono", monospace;
   letter-spacing: .1em;
   text-shadow: 0 0 5px #38ff78, 0 0 12px #1ad65c;
-  animation: start-prompt 1.2s steps(2) infinite;
 }
+
+.title-copy .difficulty-label { bottom: 12%; }
+.title-copy .start-label { bottom: 5%; animation: start-prompt 1.2s steps(2) infinite; }
 
 .controller {
   width: min(100%, 500px);

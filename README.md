@@ -113,6 +113,7 @@ or compatible emulator.
 
 Atari controls:
 
+- `D` on the title screen cycles `NORMAL`, `EASY`, and `VERY EASY`
 - Space during the opening briefing skips directly to the game
 - keyboard `P/L/O/E/G/I/S` performs the corresponding action directly
 - keyboard `A/U/D` purchases Amount, Auto, or Speed directly
@@ -124,8 +125,19 @@ Atari controls:
 
 Power, Life Support, and Processing support four main systems: Engineering,
 Guidance, Engines, and Sensors. Actions repair one system while consuming other
-resources and entering a cooldown. Main-system repairs can increase recurring
-Power or Life Support load, deducted every 20 seconds.
+resources and entering a cooldown. Press `D` on the title screen to choose a
+difficulty before starting:
+
+| Difficulty | Resource economy | Load cycle | Events |
+| --- | --- | --- | --- |
+| Normal | Original starting values, yields, and costs | 20 seconds | 10-second response window; original rewards and hazards |
+| Easy | Safer starting resources, +1 resource yield, and reduced repair costs | 24 seconds | 12-second window, less frequent events, better rewards, smaller hazards |
+| Very Easy | High starting resources, +2 resource yield, and strongly reduced costs | 30 seconds | 15-second window, least frequent events, best rewards, minimal hazards |
+
+Normal preserves the original balance. Easy preserves the normal main-system
+repair path while making resources more forgiving; Very Easy also shortens that
+repair path. Main-system repairs can still increase recurring Power or Life
+Support load.
 
 New actions unlock as repairs progress. The three modifications improve resource
 yield, add automatic production, and shorten cooldowns. The player wins when all
@@ -152,6 +164,7 @@ automatic actions, the four 20-second special operations, and random events:
 ```sh
 npm run simulate:atari -- --runs=255
 npm run simulate:atari -- --runs=1 --seed=1 --verbose
+npm run simulate:atari -- --difficulty=easy
 ```
 
 Batch mode runs immediately. To watch a run with each simulated second scaled to
@@ -161,11 +174,12 @@ resource economy without random salvage, hazards, or robot offers.
 Victory has its own spaceport-jump popup. Every failed system has its own loss
 message, while a fully radioactive meter triggers a critical-radiation ending.
 
-Random events appear in the narrow panel below the system table. Robot events
-appear more frequently and offer a one-point resource exchange for two points of
-another resource.
+Random events appear in the narrow panel below the system table. On Normal,
+robot events offer a one-point resource exchange for two points of another
+resource; easier modes increase the reward.
 Timed salvage and hazard events show a random four-digit code; entering it
-within ten seconds collects the salvage or prevents the displayed resource loss.
+within the difficulty's response window collects the salvage or prevents the
+displayed resource loss.
 
 ## VBXE implementation
 
@@ -194,11 +208,12 @@ VBXE VRAM `$039000` and draws each icon with one transparent blit.
 
 Radioactive is an inverse resource displayed directly below Processing. It starts
 at zero and has no keyboard action. A failed four-digit `RADIOACTIVE LEAK` event
-adds exactly two points, while a successful `CLEAR RADIOACTIVE LEAK` event removes
-exactly two points. These events only appear when the full change can be applied,
+adds two points on Normal (one on easier modes), while a successful
+`CLEAR RADIOACTIVE LEAK` event removes two, three, or four points depending on
+difficulty. These events only appear when the full change can be applied,
 and show their signed change beside the radioactive trefoil icon. Some robot
-offers also grant two points of a normal resource in exchange for adding one
-Radioactive point; both effects are displayed before accepting. Reaching ten
+offers grant two, three, or four points of a normal resource in exchange for
+adding one Radioactive point; both effects are displayed before accepting. Reaching ten
 Radioactive points immediately ends the mission.
 
 The 320x200 console uses compact `STATUS`, `ACTION`, `LOAD`, and `MODS` columns.
@@ -221,15 +236,17 @@ resource-cost changes, Auto shows manual production changing to automatic
 production every cooldown, and Speed shows the cooldown changing from 10 to 5
 seconds. Installed options retain this detail in a disabled style.
 
-Amount uses the original per-resource values (`+5` Power for `-2` Processing,
+On Normal, Amount uses the original per-resource values (`+5` Power for `-2` Processing,
 `+3` Life Support for `-1` Power, or `+7` Processing for `-2` Power). Auto runs
-only the selected resource action, including its costs. Speed halves only the
-selected resource action's cooldown.
+only the selected resource action, including its costs. Easy and Very Easy
+increase those yields and lower their costs consistently with the selected
+difficulty. Speed halves only the selected resource action's cooldown.
 
 Like the original interface, each unlocked `ACTION` entry shows its icon-based
 result and price. The positive term is the repaired or produced system, followed
 by every resource cost as a negative term. For example, Generate Power displays
-`+2` Power and `-1` Processing. These values update when production is modified.
+`+2` Power and `-1` Processing on Normal. These values update with difficulty
+and when production is modified.
 
 The separate `LOAD` column shows recurring deductions owned by each running
 system. Life Support begins at `-1` Life Support; repaired main systems add their
