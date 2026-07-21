@@ -143,6 +143,21 @@ JumpDrive`, then `Install Source`. Each special replaces its normal system actio
 for a 20-second operation and opens a narrative popup on completion. Installing
 the source changes Generate Power to `+10` Power with no Processing cost.
 
+### Atari gameplay simulation
+
+The accelerated simulator runs the assembly gameplay rules at a logical 50 Hz,
+including action cooldowns, recurring 20-second loads, unlocks, modifications,
+automatic actions, the four 20-second special operations, and random events:
+
+```sh
+npm run simulate:atari -- --runs=255
+npm run simulate:atari -- --runs=1 --seed=1 --verbose
+```
+
+Batch mode runs immediately. To watch a run with each simulated second scaled to
+1/100 of a real second, use `--scale=0.01`. Add `--no-events` to test the base
+resource economy without random salvage, hazards, or robot offers.
+
 Victory has its own spaceport-jump popup. Every failed system has its own loss
 message, while a fully radioactive meter triggers a critical-radiation ending.
 
