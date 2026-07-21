@@ -137,7 +137,9 @@ difficulty before starting:
 Normal preserves the original balance. Easy preserves the normal main-system
 repair path while making resources more forgiving; Very Easy also shortens that
 repair path. Main-system repairs can still increase recurring Power or Life
-Support load.
+Support load. Every system row owns an independent load timer. A newly activated
+main-system load receives a small first-cycle offset, so deductions remain
+staggered instead of combining into one potentially lethal hit.
 
 New actions unlock as repairs progress. The three modifications improve resource
 yield, add automatic production, and shorten cooldowns. The player wins when all
@@ -158,7 +160,7 @@ the source changes Generate Power to `+10` Power with no Processing cost.
 ### Atari gameplay simulation
 
 The accelerated simulator runs the assembly gameplay rules at a logical 50 Hz,
-including action cooldowns, recurring 20-second loads, unlocks, modifications,
+including action cooldowns, independent recurring loads, unlocks, modifications,
 automatic actions, the four 20-second special operations, and random events:
 
 ```sh
@@ -192,8 +194,8 @@ per pixel. The framebuffer begins at VRAM `$000000`; the XDL and blitter control
 block live in bank `$7F`.
 
 Action cooldown bars are updated at the Atari frame rate. They shrink linearly
-over 10 seconds, or 5 seconds after the speed modification. The recurring-load
-bar uses the same frame-driven animation over its 20-second cycle.
+over 10 seconds, or 5 seconds after the speed modification. Every recurring-load
+bar uses its own frame-driven timer and phase.
 
 At startup, the game expands the Atari ROM character set at `$E000` into an 8x8
 mask font at VRAM `$038000`. Text, status bars, selection rows, windows, and
@@ -250,11 +252,12 @@ and when production is modified.
 
 The separate `LOAD` column shows recurring deductions owned by each running
 system. Life Support begins at `-1` Life Support; repaired main systems add their
-own Power and Life Support terms as their operating load increases. Those terms
-are summed and deducted on a shared cycle. As in the original game, the first
-Life Support deduction occurs after four seconds; later cycles take twenty
-seconds. The countdown is shown as an animated overlay inside each active `LOAD`
-cell rather than as a separate footer timer.
+own Power and Life Support terms as their operating load increases. Each row
+deducts only its displayed terms when its independent cycle expires. The first
+Life Support deduction occurs after 4/6/8 seconds by difficulty. New Engineering,
+Guidance, Engines, and Sensors loads start a full cycle with respective additional
+offsets of 0/3/6/9 seconds; later cycles use the difficulty's normal 20/24/30
+seconds. The countdown is shown inside each active `LOAD` cell.
 
 The original browser game is retained under `legacy/original-browser/` as a
 rules and interface reference. It is not part of the Vite production build.

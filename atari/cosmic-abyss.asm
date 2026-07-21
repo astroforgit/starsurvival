@@ -193,7 +193,8 @@ difficulty dta 0                ; 0 Normal, 1 Easy, 2 Very Easy
 old_stick dta 15
 old_fire dta 1
 frame50  dta 0
-load_sec dta 20
+load_sec dta 0,4,0,0,0,0,0    ; independent remaining seconds per system row
+load_frac dta 0,50,0,0,0,0,0  ; independent 1/50-second phase per row
 load_interval dta 20
 game_mode dta 0                ; 0 playing, 1 won, 2 lost
 message_timer dta 0
@@ -207,8 +208,6 @@ cooldown_full dta 10,10,10,10,10,10,10
 unlocked dta 1,0,0,0,0,0,0
 clicks   dta 0,0,0,0,0,0,0
 levels   dta 0,0,0,0
-load_pwr dta 0
-load_lif dta 1
 system_load_pwr dta 0,0,0,0,0,0,0
 system_load_lif dta 0,1,0,0,0,0,0
 amount_mask dta 0              ; bits 0..2: Power/Life Support/Processing
@@ -248,6 +247,7 @@ difficulty_cost_prc
         dta 1,0,0,2,0,0,1, 1,0,0,1,0,0,0, 0,0,0,1,0,0,0
 difficulty_initial_load dta 4,6,8
 difficulty_load_interval dta 20,24,30
+load_start_stagger dta 0,0,0,0,3,6,9
 
 names_lo dta <s_power,<s_life,<s_process,<s_engineer,<s_guidance,<s_engines,<s_sensors
 names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_sensors
@@ -281,10 +281,18 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         cmp #0
         bne ?store
 ?restart_now
-        lda #$FF
-        sta CH
         jsr game_init
         jsr draw_screen
+        ; Consume the key/button that dismissed the end screen.  A held FIRE
+        ; must not become the first action of the new campaign.
+        lda #$FF
+        sta CH
+        lda PORTA
+        and #15
+        sta old_stick
+        lda STRIG0
+        sta old_fire
+        jmp loop
 ?store  lda STRIG0
         sta old_fire
         jmp loop
@@ -300,6 +308,8 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         sta unlocked,x
         sta system_load_pwr,x
         sta system_load_lif,x
+        sta load_sec,x
+        sta load_frac,x
         sta special_available,x
         sta special_done,x
         sta special_sec,x
@@ -310,13 +320,11 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         bpl ?copy
         lda #1
         sta unlocked
-        sta load_lif
         sta system_load_lif+1
         lda #0
         sta selected
         sta frame50
         sta game_mode
-        sta load_pwr
         sta amount_mask
         sta auto_mask
         sta speed_mask
@@ -326,15 +334,19 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         sta radioactive
         sta relax_done
         sta relax_release
+        sta cooldown_ready
+        sta message_timer
         sta old_stick
         jsr init_events
         lda #$FF
         sta failure_system
         ldx difficulty
         lda difficulty_initial_load,x
-        sta load_sec
+        sta load_sec+1
         lda difficulty_load_interval,x
         sta load_interval
+        lda #50
+        sta load_frac+1
         lda RTCLOK+2            ; choose 60..120 seconds from the live OS clock
         eor RTCLOK+1
         eor VCOUNT
@@ -430,7 +442,6 @@ names_hi dta >s_power,>s_life,>s_process,>s_engineer,>s_guidance,>s_engines,>s_s
         bcc ?done
         lda ?action_idx
         sta selected
-        jsr draw_rows
         jmp perform_action
 ?amount jmp buy_amount
 ?auto   jmp buy_auto
@@ -636,7 +647,7 @@ amount_processing_pwr_cost dta 2,1,1
         lda #50
         sta special_frac,x
         jsr draw_rows
-        jmp draw_footer
+        rts
 ?normal_action
         lda health+2
         cmp cost_prc,x
@@ -671,6 +682,13 @@ amount_processing_pwr_cost dta 2,1,1
         lda health,x
         clc
         adc gain_tab,x
+        cpx #3
+        bcc ?resource_gain
+        cmp #9                  ; main systems are fully repaired at eight bars
+        bcc ?gainok
+        lda #8
+        bne ?gainok
+?resource_gain
         cmp #11
         bcc ?gainok
         lda #10
@@ -694,8 +712,24 @@ amount_processing_pwr_cost dta 2,1,1
         jsr check_end
         lda game_mode
         bne ?done
+        ldx selected
+        cpx #3
+        bcs ?manual_redraw
+        lda bit_tab,x
+        and auto_mask
+        beq ?manual_redraw
+        ; Automatic resource production can restart several bars close
+        ; together. Only resource pills changed; the new strip is painted by
+        ; draw_progress later in this same frame.
+        ldx #0
+        jsr draw_system_status
+        ldx #1
+        jsr draw_system_status
+        ldx #2
+        jsr draw_system_status
+        rts
+?manual_redraw
         jsr draw_rows
-        jsr draw_footer
 ?done
         rts
 ?deny   rts
@@ -705,17 +739,25 @@ amount_processing_pwr_cost dta 2,1,1
         ldx selected
         cpx #3
         bcc ?r
+        lda system_load_pwr,x
+        ora system_load_lif,x
+        bne ?existing_cycle
+        lda load_interval       ; each new main load gets a visible, safe phase
+        clc
+        adc load_start_stagger,x
+        sta load_sec,x
+        lda #50
+        sta load_frac,x
+?existing_cycle
         lda clicks,x
         cmp #1
         bne ?second
-        inc load_pwr
         inc system_load_pwr,x
         cpx #3
         beq ?life
         cpx #5
         bne ?r
-?life   inc load_lif
-        inc system_load_lif,x
+?life   inc system_load_lif,x
         rts
 ?second cmp #2
         bne ?third
@@ -723,22 +765,15 @@ amount_processing_pwr_cost dta 2,1,1
         beq ?life2
         cpx #5
         bne ?r
-        inc load_pwr
         inc system_load_pwr,x
         rts
-?life2  inc load_lif
-        inc system_load_lif,x
+?life2  inc system_load_lif,x
         rts
 ?third  cmp #3
         bne ?r
         cpx #3
         bne ?guidance4
-        inc load_pwr
         inc system_load_pwr,x
-        lda load_lif
-        clc
-        adc #3
-        sta load_lif
         lda system_load_lif,x
         clc
         adc #3
@@ -746,15 +781,10 @@ amount_processing_pwr_cost dta 2,1,1
         rts
 ?guidance4 cpx #4
         bne ?engines4
-        inc load_pwr
         inc system_load_pwr,x
         rts
 ?engines4 cpx #5
         bne ?r
-        lda load_pwr
-        clc
-        adc #3
-        sta load_pwr
         lda system_load_pwr,x
         clc
         adc #3
@@ -782,8 +812,8 @@ amount_processing_pwr_cost dta 2,1,1
         bne ?no
         cpx #3
         bcc ?yes
-        lda clicks,x
-        cmp #3
+        lda health,x
+        cmp #8                  ; hide the normal repair key at completion
         bcs ?no
 ?yes
         sec
@@ -927,8 +957,13 @@ mod_check_mask dta 0
 .proc tick_game
         jsr tick_cooldowns
         jsr tick_specials
+        lda story_type
+        bne ?r                 ; the popup owns the screen as soon as it opens
         jsr run_auto_actions
         jsr tick_event_result
+        jsr tick_loads
+        lda game_mode
+        bne ?r
         jsr draw_progress
         inc frame50
         lda frame50
@@ -940,34 +975,57 @@ mod_check_mask dta 0
         lda story_type
         bne ?r
         jsr tick_events
-        lda game_mode
-        bne ?r
-        dec load_sec
-?load   lda load_sec
-        ; draw_progress already updates the narrow load strips every frame.
-        ; Repainting every complete row once per second made the live columns
-        ; visibly flash even though no row content had changed.
-        bne ?r
+?r      rts
+.endp
+
+.proc tick_loads
+        lda #0
+        sta ?changed
+        ldx #0
+?row    stx ?idx
+        lda system_load_pwr,x
+        ora system_load_lif,x
+        beq ?next
+        dec load_frac,x
+        bne ?next
+        lda #50
+        sta load_frac,x
+        dec load_sec,x
+        bne ?next
         lda load_interval
-        sta load_sec
+        sta load_sec,x          ; only this row begins its next cycle
         lda health
         sec
-        sbc load_pwr
-        bcs ?p
+        sbc system_load_pwr,x
+        bcs ?power_ok
         lda #0
-?p      sta health
+?power_ok
+        sta health
         lda health+1
         sec
-        sbc load_lif
-        bcs ?l
+        sbc system_load_lif,x
+        bcs ?life_ok
         lda #0
-?l      sta health+1
+?life_ok
+        sta health+1
+        inc ?changed
+?next   ldx ?idx
+        inx
+        cpx #7
+        bne ?row
+        lda ?changed
+        beq ?done
         jsr check_end
         lda game_mode
-        bne ?r
-        jsr draw_rows
-        jsr draw_footer
-?r      rts
+        bne ?done
+        ; Only the two resource pill groups can change during a load cycle.
+        ldx #0
+        jsr draw_system_status
+        ldx #1
+        jsr draw_system_status
+?done   rts
+?idx    dta 0
+?changed dta 0
 .endp
 
 .proc tick_relaxation
@@ -1036,7 +1094,9 @@ mod_check_mask dta 0
         bne ?next
         dec cooldown,x
         bne ?reload
-        inc cooldown_ready
+        lda bit_tab,x
+        ora cooldown_ready
+        sta cooldown_ready       ; remember exactly which strips completed
         jmp ?next
 ?reload
         lda #50
@@ -1045,9 +1105,21 @@ mod_check_mask dta 0
         bpl ?loop
         lda cooldown_ready
         beq ?done
-        jsr draw_rows
+        ldx #0
+?ready_loop
+        lda bit_tab,x
+        and cooldown_ready
+        beq ?ready_next
+        stx ?ready_idx
+        jsr draw_ready_shortcut
+        ldx ?ready_idx
+?ready_next
+        inx
+        cpx #7
+        bne ?ready_loop
 ?done
         rts
+?ready_idx dta 0
 .endp
 
 auto_idx dta 0
@@ -1075,6 +1147,8 @@ auto_selected dta 0
 .endp
 
 .proc check_end
+        lda game_mode
+        bne ?r                  ; draw a terminal screen only on its transition
         lda radioactive
         cmp #10
         bcc ?systems
@@ -1082,6 +1156,7 @@ auto_selected dta 0
         sta game_mode
         lda #7
         sta failure_system
+        jsr clear_end_overlays
         jsr draw_end
         rts
 ?systems
@@ -1098,12 +1173,21 @@ auto_selected dta 0
         bpl ?win
         lda #1
         sta game_mode
+        jsr clear_end_overlays
         jsr draw_end
 ?r      rts
 ?lose   lda #2
         sta game_mode
         stx failure_system
+        jsr clear_end_overlays
         jsr draw_end
+        rts
+.endp
+
+.proc clear_end_overlays
+        lda #0
+        sta modal_type
+        sta story_type
         rts
 .endp
 
@@ -2457,13 +2541,13 @@ vbreg_title_bank_off
 difficulty_name_lo dta <s_difficulty_normal,<s_difficulty_easy,<s_difficulty_very_easy
 difficulty_name_hi dta >s_difficulty_normal,>s_difficulty_easy,>s_difficulty_very_easy
 .proc draw_title_difficulty
-        lda #70
+        lda #68
         sta calc_x
         lda #0
         sta calc_x+1
         lda #166
         sta calc_y
-        lda #180
+        lda #184
         sta fr_w
         lda #0
         sta fr_w+1
@@ -2472,7 +2556,7 @@ difficulty_name_hi dta >s_difficulty_normal,>s_difficulty_easy,>s_difficulty_ver
         lda #C_WIN
         sta fr_col
         jsr fill_rect
-        lda #72
+        lda #68
         sta text_x
         lda #0
         sta text_x+1
@@ -2662,7 +2746,7 @@ vbreg_briefing_bank_on
         sta srcp+1
         dec title_rows
         lda title_rows
-        cmp #25                 ; final 25 source rows live above BASIC, away
+        cmp #50                 ; final 50 source rows live in a separate safe segment
         bne ?more               ; from the $9000-$9FFF VBXE CPU window
         lda #<briefing_bitmap_tail
         sta srcp
@@ -3034,7 +3118,9 @@ load_width_very_easy
 ?next   ldx ?idx
         lda system_load_pwr,x
         ora system_load_lif,x
-        beq ?advance
+        bne ?has_load
+        jmp ?advance
+?has_load
         lda #212
         sta calc_x
         lda #0
@@ -3052,8 +3138,16 @@ load_width_very_easy
         lda #C_WIN
         sta fr_col
         jsr fill_rect
-        lda load_sec
-        beq ?advance
+        ldx ?idx
+        lda load_sec,x
+        bne ?active_load
+        jmp ?advance
+?active_load
+        cmp load_interval
+        bcc ?load_in_range
+        beq ?load_in_range
+        lda load_interval       ; extra first-cycle stagger displays as a full bar
+?load_in_range
         ldx difficulty
         bne ?difficulty_load_width
         sec
@@ -3063,16 +3157,20 @@ load_width_very_easy
         clc
         adc ?seconds            ; Normal: (seconds-1) * 3 plus frame fraction
         sta ?loadw
-        lda #50
-        sec
-        sbc frame50
-        tay
+        ldx ?idx
+        ldy load_frac,x
         lda frac3,y
         clc
         adc ?loadw
         jmp ?load_width_ready
 ?difficulty_load_width
-        lda load_sec
+        ldx ?idx
+        lda load_sec,x
+        cmp load_interval
+        bcc ?easy_in_range
+        beq ?easy_in_range
+        lda load_interval
+?easy_in_range
         tay
         ldx difficulty
         dex
@@ -3203,6 +3301,28 @@ status_col dta 0
         cmp #10
         bne ?cell
         rts
+.endp
+
+.proc draw_system_status      ; X=system; repaint only its ten status pills
+        stx ?system
+        lda health,x
+        cmp #4
+        bcc ?offline
+        cmp #8
+        bcc ?degraded
+        lda #C_ONLINE
+        bne ?draw
+?degraded
+        lda #C_DEGRADE
+        bne ?draw
+?offline
+        lda #C_OFFLINE
+?draw   sta status_col
+        ldx ?system
+        jsr draw_status_boxes
+        ldx ?system
+        rts
+?system dta 0
 .endp
 
 .proc draw_radioactive_row
@@ -3416,6 +3536,33 @@ lm_idx dta 0
 
 action_key_glyph dta 48,44,47,37,39,41,51 ; P,L,O,E,G,I,S (ASCII-32)
 resource_key_glyph dta 48,44,47             ; P,L,O
+.proc draw_ready_shortcut      ; X=completed system; update only its 8x8 key cell
+        stx ?system
+        cpx #3
+        bcs ?active
+        lda bit_tab,x
+        and auto_mask           ; auto actions will immediately restart this cooldown
+        bne ?done
+?active jsr action_active
+        bcc ?done               ; maxed/locked actions keep their already-blank cell
+        lda #8
+        sta text_x
+        lda #0
+        sta text_x+1
+        ldx ?system
+        lda row_y_tab,x
+        clc
+        adc #3
+        sta text_y
+        lda #C_VALUE
+        sta text_col
+        lda action_key_glyph,x
+        jsr draw_char
+?done   ldx ?system
+        rts
+?system dta 0
+.endp
+
 .proc draw_special_name        ; X=main system
         stx ?system
         lda #116
@@ -3498,18 +3645,7 @@ resource_key_glyph dta 48,44,47             ; P,L,O
 
         ; Ten discrete condition boxes, matching the original browser game.
         ldx ?idx
-        lda health,x
-        cmp #4
-        bcc ?off
-        cmp #8
-        bcc ?deg
-        lda #C_ONLINE
-        bne ?boxes
-?deg    lda #C_DEGRADE
-        bne ?boxes
-?off    lda #C_OFFLINE
-?boxes  sta status_col
-        jsr draw_status_boxes
+        jsr draw_system_status
 
         ldx ?idx
         lda special_available,x
@@ -3521,8 +3657,8 @@ resource_key_glyph dta 48,44,47             ; P,L,O
         beq ?load
         cpx #3
         bcc ?price
-        lda clicks,x
-        cmp #3
+        lda health,x
+        cmp #8
         bcs ?load
 ?price
         jsr draw_action_price
@@ -4286,41 +4422,43 @@ crt_noise_points
         sta text_x+1
         lda #68
         sta text_y
-        ldx story_type
-        cpx #7
-        bne ?guidance
-        lda #<s_scan_title
-        ldx #>s_scan_title
-        bne ?title
-?guidance cpx #5
-        bne ?engines
-        lda #<s_plot_title
-        ldx #>s_plot_title
-        bne ?title
-?engines cpx #6
-        bne ?engineering
-        lda #<s_jump_title
-        ldx #>s_jump_title
-        bne ?title
-?engineering
-        lda #<s_source_title
-        ldx #>s_source_title
-?title  ldy #C_TITLE
+        lda story_type
+        sec
+        sbc #4
+        tax
+        stx ?story_idx
+        lda story_title_lo,x
+        sta ?text_ptr
+        lda story_title_hi,x
+        sta ?text_ptr+1
+        lda ?text_ptr
+        ldx ?text_ptr+1
+        ldy #C_TITLE
         jsr text_at
         lda #48
         sta text_x
         lda #86
         sta text_y
-        lda #<s_story_line1
-        ldx #>s_story_line1
+        ldx ?story_idx
+        lda story_line1_lo,x
+        sta ?text_ptr
+        lda story_line1_hi,x
+        sta ?text_ptr+1
+        lda ?text_ptr
+        ldx ?text_ptr+1
         ldy #C_TEXT
         jsr text_at
         lda #48
         sta text_x
         lda #98
         sta text_y
-        lda #<s_story_line2
-        ldx #>s_story_line2
+        ldx ?story_idx
+        lda story_line2_lo,x
+        sta ?text_ptr
+        lda story_line2_hi,x
+        sta ?text_ptr+1
+        lda ?text_ptr
+        ldx ?text_ptr+1
         ldy #C_TEXT
         jsr text_at
         lda #68
@@ -4331,6 +4469,8 @@ crt_noise_points
         ldx #>s_continue
         ldy #C_HINT
         jmp text_at
+?story_idx dta 0
+?text_ptr dta a(0)
 .endp
 
 .proc draw_end_box
@@ -4687,12 +4827,25 @@ s_scan_title dta c'SECTOR SCAN COMPLETE',0
 s_plot_title dta c'COURSE PLOTTED',0
 s_jump_title dta c'JUMPDRIVE ACTIVATED',0
 s_source_title dta c'SOURCE INSTALLED',0
-s_story_line1 dta c'OPERATION COMPLETED SUCCESSFULLY.',0
-s_story_line2 dta c'THE NEXT SHIP ACTION IS READY.',0
+s_source_line1 dta c'POWER OUTPUT IS NOW ENOUGH',0
+s_source_line2 dta c'TO COMPLETE ALL REPAIRS.',0
+s_plot_line1 dta c'GUIDANCE HAS LOCKED ONTO',0
+s_plot_line2 dta c'THE NEW POWER SOURCE.',0
+s_jump_line1 dta c'THE SHIP HAS ARRIVED.',0
+s_jump_line2 dta c'COLLECTION CAN BEGIN.',0
+s_scan_line1 dta c'A RENEWABLE POWER SOURCE',0
+s_scan_line2 dta c'HAS BEEN FOUND NEARBY.',0
+story_title_lo dta <s_source_title,<s_plot_title,<s_jump_title,<s_scan_title
+story_title_hi dta >s_source_title,>s_plot_title,>s_jump_title,>s_scan_title
+story_line1_lo dta <s_source_line1,<s_plot_line1,<s_jump_line1,<s_scan_line1
+story_line1_hi dta >s_source_line1,>s_plot_line1,>s_jump_line1,>s_scan_line1
+story_line2_lo dta <s_source_line2,<s_plot_line2,<s_jump_line2,<s_scan_line2
+story_line2_hi dta >s_source_line2,>s_plot_line2,>s_jump_line2,>s_scan_line2
 s_relax_line1 dta c'THE SITUATION IS DIFFICULT,',0
 s_relax_line2 dta c'BUT LETS HAVE A MOMENT FOR',0
 s_relax_line3 dta c'LITTLE RELAX NOW.',0
 s_continue dta c'PRESS SPACE TO CONTINUE',0
+s_relax_continue dta c'PRESS SPACE TO CONTINUE',0
 s_win_title dta c'ALL MAIN SYSTEMS ONLINE',0
 s_win_line1 dta c'JUMP COURSE TO THE NEAREST',0
 s_win_line2 dta c'SPACEPORT IS READY. YOU WIN!',0
@@ -4756,7 +4909,7 @@ title_bitmap
         ins 'atari/title-screen.2bpp'
 
 briefing_bitmap
-        ; First 75 rows of the 160x100 repair image. Keeping this block below
+        ; First 50 rows of the 160x100 repair image. Keeping this block below
         ; $9000 prevents MEMAC-A from hiding it while it is being drawn.
         ins 'atari/repair-screen-top.2bpp'
 
@@ -5157,8 +5310,16 @@ digit_scan_codes
         jsr check_end
         lda game_mode
         bne ?done
-        jsr draw_rows
-        jsr draw_footer
+        ; Event effects touch only resource pills (and sometimes radiation).
+        ; Keep all unrelated rows, action text, loads, and frames stable.
+        ldx #0
+        jsr draw_system_status
+        ldx #1
+        jsr draw_system_status
+        ldx #2
+        jsr draw_system_status
+        jsr draw_radioactive_row
+        jsr draw_event_panel
 ?done   rts
 .endp
 
@@ -5844,11 +6005,9 @@ relax_type_skip dta 0
 ?done   rts
 .endp
 
-s_relax_continue dta c'PRESS SPACE TO CONTINUE',0
-
-        org $BC00
+        org $1000
 briefing_bitmap_tail
-        ; Final 25 repair rows, stored in RAM exposed beneath BASIC ROM.
+        ; Final 50 repair rows, stored in otherwise unused RAM below main.
         ins 'atari/repair-screen-tail.2bpp'
 
         run main

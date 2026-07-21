@@ -47,6 +47,7 @@ const SALVAGE_DESCRIPTIONS = ["ALPHA MACHINE", "HELP RESEARCH", "REPAIR DRONE", 
 const HAZARD_DESCRIPTIONS = ["COOLANT LEAK", "RESEARCH FIRE", "POWER SURGE", "CORE FAILURE"];
 const RADIOACTIVE_ICON = 7;
 const RADIOACTIVE_ROW_Y = 60;
+const LOAD_START_STAGGER = [0, 0, 0, 0, 3, 6, 9];
 // Match the Atari layout: resources stay compact, Radioactive occupies the
 // separator, and every main-system row is shifted down together.
 const ROW_Y = [18, 32, 46, 80, 94, 108, 122];
@@ -93,15 +94,13 @@ let briefingActive = false;
 let briefingChars = 0;
 let briefingStarted = 0;
 let selected;
-let loadSec;
+let loadTimer;
 let gameMode; // 0 playing, 1 won, 2 lost
 let health;
 let cooldown;
 let cooldownMax;
 let unlocked;
 let clicks;
-let loadPwr;
-let loadLif;
 let systemLoadPwr;
 let systemLoadLif;
 let gainTab;
@@ -177,21 +176,19 @@ function clamp(value, low, high) {
 
 function isActionActive(index) {
   if (specialAvailable[index]) return specialTimer[index] === 0;
-  return Boolean(unlocked[index]) && cooldown[index] === 0 && !(index >= 3 && clicks[index] >= 3);
+  return Boolean(unlocked[index]) && cooldown[index] === 0 && !(index >= 3 && health[index] >= 8);
 }
 
 function gameInit() {
   const difficulty = DIFFICULTIES[difficultyIndex];
   selected = 0;
-  loadSec = difficulty.initialLoadDelay;
+  loadTimer = [0, difficulty.initialLoadDelay, 0, 0, 0, 0, 0];
   gameMode = 0;
   health = [...difficulty.initial];
   cooldown = [0, 0, 0, 0, 0, 0, 0];
   cooldownMax = [10, 10, 10, 10, 10, 10, 10];
   unlocked = [1, 0, 0, 0, 0, 0, 0];
   clicks = [0, 0, 0, 0, 0, 0, 0];
-  loadPwr = 0;
-  loadLif = 1;
   systemLoadPwr = [0, 0, 0, 0, 0, 0, 0];
   systemLoadLif = [0, 1, 0, 0, 0, 0, 0];
   gainTab = [...difficulty.gain];
@@ -213,6 +210,11 @@ function gameInit() {
   initEvents();
   announce(`${difficulty.name} game. Power selected.`);
   drawScreen();
+}
+
+function restartGame() {
+  lastTime = performance.now();
+  gameInit();
 }
 
 function randomInt(max) {
@@ -424,7 +426,7 @@ function advanceBriefing() {
 
 function performAction(actionIndex = selected) {
   if (gameMode) {
-    gameInit();
+    restartGame();
     return;
   }
   if (!isActionActive(actionIndex)) return;
@@ -441,7 +443,8 @@ function performAction(actionIndex = selected) {
   health[2] = Math.max(-1, health[2] - actionCostPrc[i]);
   health[0] = Math.max(-1, health[0] - actionCostPwr[i]);
   health[1] = Math.max(-1, health[1] - actionCostLif[i]);
-  health[i] = clamp(health[i] + gainTab[i], 0, 10);
+  const statusLimit = i >= 3 ? 8 : 10;
+  health[i] = clamp(health[i] + gainTab[i], 0, statusLimit);
   clicks[i]++;
   addSystemLoad(i);
   cooldownMax[i] = speedMask & (1 << i) ? 5 : 10;
@@ -449,39 +452,34 @@ function performAction(actionIndex = selected) {
   updateProgress();
   updateSpecials();
   checkEnd();
-  announce(`${NAMES[i]} action complete. Status ${health[i]} of 10.`);
+  announce(`${NAMES[i]} action complete. Status ${health[i]} of ${statusLimit}.`);
   drawScreen();
 }
 
 function addSystemLoad(i) {
   if (i < 3) return;
+  if (!systemLoadPwr[i] && !systemLoadLif[i]) {
+    loadTimer[i] = DIFFICULTIES[difficultyIndex].loadInterval + LOAD_START_STAGGER[i];
+  }
   if (clicks[i] === 1) {
-    loadPwr++;
     systemLoadPwr[i]++;
     if (i === 3 || i === 5) {
-      loadLif++;
       systemLoadLif[i]++;
     }
   } else if (clicks[i] === 2) {
     if (i === 3) {
-      loadLif++;
       systemLoadLif[i]++;
     }
     if (i === 5) {
-      loadPwr++;
       systemLoadPwr[i]++;
     }
   } else if (clicks[i] === 3) {
     if (i === 3) {
-      loadPwr++;
-      loadLif += 3;
       systemLoadPwr[i]++;
       systemLoadLif[i] += 3;
     } else if (i === 4) {
-      loadPwr++;
       systemLoadPwr[i]++;
     } else if (i === 5) {
-      loadPwr += 3;
       systemLoadPwr[i] += 3;
     }
   }
@@ -604,13 +602,18 @@ function tickGame(deltaSeconds) {
     }
   }
 
-  loadSec -= deltaSeconds;
-
-  if (loadSec <= 0) {
-    loadSec += DIFFICULTIES[difficultyIndex].loadInterval;
-    health[0] = clamp(health[0] - loadPwr, 0, 10);
-    health[1] = clamp(health[1] - loadLif, 0, 10);
-    announce(`Load cycle deducted ${loadPwr} power and ${loadLif} life support.`);
+  const expiredLoads = [];
+  for (let i = 0; i < loadTimer.length; i++) {
+    if (!systemLoadPwr[i] && !systemLoadLif[i]) continue;
+    loadTimer[i] -= deltaSeconds;
+    if (loadTimer[i] > 0) continue;
+    loadTimer[i] += DIFFICULTIES[difficultyIndex].loadInterval;
+    health[0] = clamp(health[0] - systemLoadPwr[i], 0, 10);
+    health[1] = clamp(health[1] - systemLoadLif[i], 0, 10);
+    expiredLoads.push(NAMES[i]);
+  }
+  if (expiredLoads.length) {
+    announce(`${expiredLoads.join(" and ")} load cycle deducted its displayed resources.`);
     checkEnd();
   }
 
@@ -618,6 +621,7 @@ function tickGame(deltaSeconds) {
 }
 
 function checkEnd() {
+  if (gameMode) return;
   if (radioactive >= 10) {
     failureSystem = RADIOACTIVE_ICON;
     gameMode = 2;
@@ -719,8 +723,8 @@ function drawRows() {
       const progress = specialTimer[i] > 0 ? specialTimer[i] / 20 : cooldown[i] / cooldownMax[i];
       fillRoundRect(112, y, Math.round(100 * progress), 14, 3, C.cooldown);
     }
-    if ((systemLoadPwr[i] || systemLoadLif[i]) && loadSec > 0) {
-      const loadProgress = Math.min(1, loadSec / DIFFICULTIES[difficultyIndex].loadInterval);
+    if ((systemLoadPwr[i] || systemLoadLif[i]) && loadTimer[i] > 0) {
+      const loadProgress = Math.min(1, loadTimer[i] / DIFFICULTIES[difficultyIndex].loadInterval);
       fillRoundRect(212, y, Math.round(72 * loadProgress), 14, 3, C.loadProgress);
     }
     if (isActionActive(i)) textAt(ACTION_KEYS[i], 8, y + 3, C.value);
@@ -728,7 +732,7 @@ function drawRows() {
     const statusColor = health[i] >= 8 ? C.online : health[i] >= 4 ? C.degraded : C.offline;
     drawStatusBoxes(health[i], 32, y + 4, statusColor, rowBackground);
     if (specialAvailable[i]) textAt(getSpecialName(i), 116, y + 3, C.value);
-    else if (unlocked[i] && !(i >= 3 && clicks[i] >= 3)) drawActionPrice(i, 116, y + 3);
+    else if (unlocked[i] && !(i >= 3 && health[i] >= 8)) drawActionPrice(i, 116, y + 3);
     drawSystemLoad(i, 216, y + 3);
 
     const modification = getModificationState(i);
@@ -1022,6 +1026,13 @@ document.addEventListener("keydown", event => {
     }
     return;
   }
+  if (gameMode) {
+    if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
+      event.preventDefault();
+      restartGame();
+    }
+    return;
+  }
   const controls = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", " ": "fire", Enter: "fire" };
   const key = event.key.toLowerCase();
   if (storyType !== null) {
@@ -1107,6 +1118,10 @@ document.querySelectorAll("[data-event-digit]").forEach(button => {
 canvas.addEventListener("click", event => {
   if (startGame()) return;
   if (advanceBriefing()) return;
+  if (gameMode) {
+    restartGame();
+    return;
+  }
   if (storyType !== null) {
     storyType = null;
     drawScreen();

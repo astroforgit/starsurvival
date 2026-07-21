@@ -37,6 +37,7 @@ const DIFFICULTIES = {
   }
 };
 const BIT = [1, 2, 4, 8, 16, 32, 64];
+const LOAD_START_STAGGER = [0, 0, 0, 0, 3, 6, 9];
 const SPECIAL_NAME = { 3: "INSTALL SOURCE", 4: "PLOT COURSE", 5: "ACTIVATE JUMPDRIVE", 6: "SCAN SECTOR" };
 
 function numberArg(name, fallback) {
@@ -81,8 +82,8 @@ class AtariGame {
     this.loadLife = 1;
     this.systemLoadPower = Array(7).fill(0);
     this.systemLoadLife = [0, 1, 0, 0, 0, 0, 0];
-    this.loadFrames = this.balance.initialLoadDelay * 50;
     this.loadIntervalFrames = this.balance.loadInterval * 50;
+    this.loadFrames = [0, this.balance.initialLoadDelay * 50, 0, 0, 0, 0, 0];
     this.amountMask = 0;
     this.autoMask = 0;
     this.speedMask = 0;
@@ -123,7 +124,7 @@ class AtariGame {
 
   actionActive(system) {
     if (this.specialAvailable[system]) return this.specialFrames[system] === 0;
-    return this.unlocked[system] && this.cooldown[system] === 0 && (system < 3 || this.clicks[system] < 3);
+    return this.unlocked[system] && this.cooldown[system] === 0 && (system < 3 || this.health[system] < 8);
   }
 
   safeToPay(system) {
@@ -145,7 +146,7 @@ class AtariGame {
     this.health[2] = Math.max(0, this.health[2] - this.processingCost[system]);
     this.health[0] = Math.max(0, this.health[0] - this.powerCost[system]);
     this.health[1] = Math.max(0, this.health[1] - this.lifeCost[system]);
-    this.health[system] = Math.min(10, this.health[system] + this.gain[system]);
+    this.health[system] = Math.min(system >= 3 ? 8 : 10, this.health[system] + this.gain[system]);
     this.clicks[system] += 1;
     this.addSystemLoad(system);
     this.cooldown[system] = this.cooldownFull[system];
@@ -158,6 +159,9 @@ class AtariGame {
 
   addSystemLoad(system) {
     if (system < 3) return;
+    if (!this.systemLoadPower[system] && !this.systemLoadLife[system]) {
+      this.loadFrames[system] = this.loadIntervalFrames + LOAD_START_STAGGER[system] * 50;
+    }
     const click = this.clicks[system];
     const addPower = (amount) => {
       this.loadPower += amount;
@@ -358,19 +362,24 @@ class AtariGame {
     for (let i = 0; i < 7; i += 1) if (this.cooldown[i]) this.cooldown[i] -= 1;
     this.tickSpecials();
     this.tickAutos();
-    this.loadFrames -= 1;
+    for (let system = 0; system < 7 && this.mode === "playing"; system += 1) {
+      if (!this.systemLoadPower[system] && !this.systemLoadLife[system]) continue;
+      this.loadFrames[system] -= 1;
+      if (this.loadFrames[system] > 0) continue;
+      this.loadFrames[system] = this.loadIntervalFrames;
+      this.health[0] = Math.max(0, this.health[0] - this.systemLoadPower[system]);
+      this.health[1] = Math.max(0, this.health[1] - this.systemLoadLife[system]);
+      this.loadHistory.push({
+        time: this.seconds(), system, power: this.systemLoadPower[system],
+        life: this.systemLoadLife[system], health: [...this.health]
+      });
+      this.record(`${NAMES[system]} LOAD`, `-${this.systemLoadPower[system]} Power, -${this.systemLoadLife[system]} Life`);
+      this.checkEnd();
+    }
     this.secondFrame -= 1;
     if (this.secondFrame === 0) {
       this.secondFrame = 50;
       this.tickEvents();
-    }
-    if (this.loadFrames === 0 && this.mode === "playing") {
-      this.loadFrames = this.loadIntervalFrames;
-      this.health[0] = Math.max(0, this.health[0] - this.loadPower);
-      this.health[1] = Math.max(0, this.health[1] - this.loadLife);
-      this.loadHistory.push({ time: this.seconds(), power: this.loadPower, life: this.loadLife, health: [...this.health] });
-      this.record("20s LOAD", `-${this.loadPower} Power, -${this.loadLife} Life`);
-      this.checkEnd();
     }
   }
 }
@@ -413,8 +422,11 @@ class KeySpamBot {
     if (system === 1) life = Math.min(10, life + g.gain[1]);
     // If Generate Power/Cycle Air will be ready before the deduction, the bot
     // still has a chance to replenish; otherwise retain at least one point.
-    const powerCanRecover = system !== 0 && g.cooldown[0] < g.loadFrames;
-    const lifeCanRecover = system !== 1 && g.cooldown[1] < g.loadFrames;
+    const activeTimers = g.loadFrames.filter((timer, index) =>
+      timer > 0 && (g.systemLoadPower[index] || g.systemLoadLife[index]));
+    const nextLoad = activeTimers.length ? Math.min(...activeTimers) : g.loadIntervalFrames;
+    const powerCanRecover = system !== 0 && g.cooldown[0] < nextLoad;
+    const lifeCanRecover = system !== 1 && g.cooldown[1] < nextLoad;
     return (powerCanRecover || power > g.loadPower)
       && (lifeCanRecover || life > g.loadLife);
   }
@@ -524,7 +536,7 @@ function printRun(game, verbose) {
   console.log(`${status} seed=${game.initialSeed.toString(16).padStart(2, "0")} time=${game.seconds().toFixed(2)}s`);
   console.log(`  final: ${NAMES.map((name, i) => `${name}=${game.health[i]}`).join(" ")} RADIOACTIVE=${game.radioactive}`);
   console.log(`  minimum: ${NAMES.slice(0, 3).map((name, i) => `${name}=${game.minimum[i]}`).join(" ")}`);
-  console.log(`  difficulty: ${game.difficultyName}; recurring load: -${game.loadPower} Power / -${game.loadLife} Life every ${game.balance.loadInterval}s`);
+  console.log(`  difficulty: ${game.difficultyName}; total configured load: -${game.loadPower} Power / -${game.loadLife} Life across independent ${game.balance.loadInterval}s row cycles`);
   console.log(`  repairs: E=${game.clicks[3]} G=${game.clicks[4]} N=${game.clicks[5]} S=${game.clicks[6]}; source=${game.sourceInstalled ? "installed" : "not installed"}`);
   if (game.failure) console.log(`  stopped: ${game.failure}`);
   if (verbose) {

@@ -10,7 +10,7 @@ JAK GRAĆ
 
 Celem jest doprowadzenie czterech głównych systemów – Inżynierii, Nawigacji, Silników i Sensorów – do stanu ONLINE. Jednocześnie należy produkować energię, podtrzymywać życie i zdobywać materiały do przetwarzania. Każda akcja daje określony zasób, ale może zużywać inne. Jeżeli którykolwiek z kluczowych systemów spadnie do zera, misja kończy się katastrofą.
 
-Naprawy zwiększają stałe obciążenie statku, odejmowane co 20, 24 lub 30 sekund zależnie od poziomu trudności. Modyfikacje Amount, Auto i Speed zwiększają wydajność, automatyzują produkcję lub skracają czas oczekiwania. Podczas gry pojawiają się oferty robotów, awarie i czterocyfrowe kody alarmowe. Radioactive jest zasobem odwrotnym: zaczyna od zera, a nieudane akcje mogą zwiększać poziom skażenia.
+Naprawy zwiększają stałe obciążenie statku, odejmowane co 20, 24 lub 30 sekund zależnie od poziomu trudności. Każdy system ma własny, przesunięty w czasie licznik obciążenia, więc koszty nie są odejmowane jednocześnie. Modyfikacje Amount, Auto i Speed zwiększają wydajność, automatyzują produkcję lub skracają czas oczekiwania. Podczas gry pojawiają się oferty robotów, awarie i czterocyfrowe kody alarmowe. Radioactive jest zasobem odwrotnym: zaczyna od zera, a nieudane akcje mogą zwiększać poziom skażenia.
 
 STEROWANIE
 
